@@ -557,10 +557,7 @@ ggplot(final_data, aes(x = as.factor(stunting))) +
   labs(title = "Distribusi Data Stunting",
        x = "Stunting",
        y = "Frekuensi") +
-  theme_minimal()
-```
-Dikarenakan variabel target cukup seimbang, maka tidak diperlukannya menggunakan SMOTE
-```{r}
+  theme_minimal
 glimpse(final_data)
 ```
 
@@ -603,8 +600,8 @@ quantile(boot_result$t, probs = c(0.025, 0.975))
 data_train$stunting <- as.factor(data_train$stunting)
 data_test$stunting <- as.factor(data_test$stunting)
 
-# Set seed untuk hasil yang reproducible
-set.seed(123)
+# Membangun Model RF
+set.seed(123) #Set seed untuk hasil yang reproducible
 rf_model <- randomForest(stunting ~ ., data = data_train, importance = TRUE)
 
 # Print hasil model
