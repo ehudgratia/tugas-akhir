@@ -1,8 +1,8 @@
 ---
-title: ANALISIS PREDIKSI STUNTING PADA BALITA MENGGUNAKAN MACHINE LEARNING DENGAN
-  FAKTOR SOSIOEKONOMI
+title: ANALISIS PREDIKSI STUNTING PADA BALITA MENGGUNAKAN MACHINE LEARNING DENGAN   FAKTOR
+  SOSIOEKONOMI
 author: "Andre Daniel Sitinjak & Ehud Gratia Manullang"
-date: "2024-12-18"
+date: "2025-04-12"
 output: html_document
 ---
 
@@ -737,5 +737,3 @@ $$F1-Score = 2×Precision × Recall/Precision + Recall$$
 f1_score <- 2 * (precision * recall) / (precision + recall)
 f1_score
 ```
-
-
