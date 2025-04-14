@@ -608,17 +608,12 @@ rf_model <- randomForest(stunting ~ ., data = data_train, importance = TRUE)
 print(rf_model)
 ```
 ```{r}
-# Prediksi
-pred_train <- predict(rf_model, newdata = data_train, type = "class")
+# Melakukan Prediksi
 pred_test  <- predict(rf_model, newdata = data_test, type = "class")
-
-# Evaluasi model pada training data
-conf_matrix_train <- confusionMatrix(pred_train, data_train$stunting)
-print(conf_matrix_train)
 
 # Evaluasi model pada test data
 conf_matrix_test <- confusionMatrix(pred_test, data_test$stunting)
-print(conf_matrix_test)
+conf_matrix_test
 
 # Menampilkan metrik tambahan untuk test data
 cat("Akurasi pada data test:", conf_matrix_test$overall["Accuracy"], "\n")
