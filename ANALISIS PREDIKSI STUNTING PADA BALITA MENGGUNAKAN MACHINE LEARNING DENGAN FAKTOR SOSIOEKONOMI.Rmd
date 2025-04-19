@@ -573,7 +573,7 @@ data_train
 data_test
 ```
 
-## b. Melakukan Bootstrap sampling
+## b. Membuat model RF
 ```{r}
 data_train$stunting <- as.numeric(as.character(data_train$stunting))
 
@@ -594,7 +594,6 @@ hist(boot_result$t, col = "blue", main = "Distribusi Bootstrap Mean Stunting", x
 # menghitung interval kepercayaan
 quantile(boot_result$t, probs = c(0.025, 0.975))
 ```
-## c. Membuat model RF
 ```{r}
 # mengubah variabel target menjadi faktor
 data_train$stunting <- as.factor(data_train$stunting)
@@ -609,17 +608,17 @@ print(rf_model)
 ```
 ```{r}
 # Melakukan Prediksi
-pred_test  <- predict(rf_model, newdata = data_test, type = "class")
+pred_rf  <- predict(rf_model, newdata = data_test, type = "class")
 
 # Evaluasi model pada test data
-conf_matrix_test <- confusionMatrix(pred_test, data_test$stunting)
-conf_matrix_test
+conf_matrix_rf <- confusionMatrix(pred_rf, data_test$stunting)
+conf_matrix_rf
 
 # Menampilkan metrik tambahan untuk test data
-cat("Akurasi pada data test:", conf_matrix_test$overall["Accuracy"], "\n")
-cat("Recall pada data test:", conf_matrix_test$byClass["Sensitivity"], "\n")
-cat("Precision pada data test:", conf_matrix_test$byClass["Precision"], "\n")
-cat("F1-score pada data test:", conf_matrix_test$byClass["F1"], "\n")
+cat("Akurasi pada data test:", conf_matrix_rf$overall["Accuracy"], "\n")
+cat("Recall pada data test:", conf_matrix_rf$byClass["Sensitivity"], "\n")
+cat("Precision pada data test:", conf_matrix_rf$byClass["Precision"], "\n")
+cat("F1-score pada data test:", conf_matrix_rf$byClass["F1"], "\n")
 ```
 ```{r}
 # Plot pentingnya fitur
@@ -638,28 +637,14 @@ ggplot(importance, aes(x = reorder(row.names(importance), MeanDecreaseGini), y =
 ```
 ```{r}
 # Hitung probabilitas prediksi
-probabilities <- predict(rf_model, data_test, type = "prob")[,2]
+probabilities_rf <- predict(rf_model, data_test, type = "prob")[,2]
 
 # ROC Curve dan AUC
-roc_curve <- roc(data_test$stunting, probabilities)
+roc_curve <- roc(data_test$stunting, probabilities_rf)
 plot(roc_curve, col = "blue", main = "ROC Curve - Random Forest")
 auc(roc_curve)
 ```
 ##SVM
-```{r}
-final_data$stunting <- as.factor(final_data$stunting)
-
-set.seed(101)
-sample <- sample.split(final_data$stunting, SplitRatio = 0.7) # 70% untuk data train dan sisanya untuk test
-train <- subset(final_data, sample == TRUE)
-test <- subset(final_data, sample == FALSE)
-```
-
-```{r}
-dim(train)
-dim(test)
-```
-
 ```{r}
 tune.out <- tune(svm, stunting ~ ., data = final_data, ranges = list(cost = c(0.1, 1, 10), gamma = c(0.1, 1, 10)))
 summary(tune.out)
