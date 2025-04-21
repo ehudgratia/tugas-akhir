@@ -10,33 +10,36 @@ output: html_document
 ```{r}
 # Library yang berisi kumpulan packages untuk analisis data
 library(tidyverse)
-# library untuk manipulasi data
-library(dplyr)
-# library untuk manipulasi data tanggal
-library(lubridate)
 # library untuk menampilkan hasil statistik deskriptif
 library(summarytools)
-# library untuk visualisasi data
-library (ggplot2)
 #Mengabungkan visualisasi
 library(gridExtra)
 # library untuk membaca data dari file Excel (.xlsx)
 library(readxl)
+# library untuk membangun dan mengevaluasi model machine learning
 library(caret)
-#PCA
+# library untuk melakukan analisis multivariat
 library(FactoMineR)
-#visualisasi PCA
+# library untuk visualisasi hasil analisis multivariat
 library(factoextra)
-#Correlation Matrix
+# library untuk membuat visualisasi matriks korelasi secara grafis
 library(corrplot)
 # Visualisasi Correlation Matrix
 library(ggcorrplot)
+# library untuk Implementasi Random Forest yang lebih cepat dan efisien
 library(ranger)
+# library untuk membangun model Random Forest
 library(randomForest)
+# library untuk membuat kurva ROC dan menghitung AUC
 library(pROC)
+# library untuk melakukan analisis statistik berbasis bootstrap
 library(boot)
+# library untuk membagi data menjadi train dan test
 library(caTools)
+# library untuk implementasi Support Vector Machine (SVM)
 library(e1071)
+# library untuk mengetahui feature importance dari model svm
+library(iml)
 ```
 # 2. Obtain - Load Dataset
 ## a. Import Dataset
@@ -573,7 +576,7 @@ data_train
 data_test
 ```
 
-## b. Membuat model RF
+## b. Membangun model RF
 ```{r}
 data_train$stunting <- as.numeric(as.character(data_train$stunting))
 
@@ -644,76 +647,73 @@ roc_curve <- roc(data_test$stunting, probabilities_rf)
 plot(roc_curve, col = "blue", main = "ROC Curve - Random Forest")
 auc(roc_curve)
 ```
-##SVM
+## Membangun Model SVM
 ```{r}
-tune.out <- tune(svm, stunting ~ ., data = final_data, ranges = list(cost = c(0.1, 1, 10), gamma = c(0.1, 1, 10)))
-summary(tune.out)
-```
-```{r}
-colnames(train)
-```
-
-# Model
-```{r}
-model <- svm(stunting ~., data = train[1:7])
-summary(model)
+svm_model <- svm(stunting ~., data = data_train)
+print(svm_model)
 ```
 
 
 ```{r}
-predict.values <- predict(model,test[1:7])
-table(predict.values, test$stunting)
+# Melakukan prediksi
+pred_svm <- predict(svm_mode, data_test)
+
+# Evaluasi model pada test data
+conf_matrix_svm <- confusionMatrix(pred_svm, data_test$stunting)
+conf_matrix_svm
 ```
-Interpretasi:
-1. Baris pertama (0) menunjukkan situasi ketika sebenarnya adalah kelas 0 (Tidak Stunting). Model berhasil memprediksi dengan benar sebagai kelas 0 sebanyak 8126 kali (True Negative - TN). Model gagal sebanyak 303 kali (False Positive - FP), di mana balita yang sebenarnya tidak stunting justru diprediksi stunting.
+```{r}
+# menggunakan karnel radial
+svm_radial <-svm(stunting ~., data = data_train, kernel = 'radial', cost = 100, gamma = 0.1)
+predicted.values <- predict(svm_radial, data_test)
 
-2. Baris kedua (1) menunjukkan situasi ketika sebenarnya adalah kelas 1 (Stunting). Model berhasil memprediksi dengan benar sebagai kelas 1 sebanyak 8299 kali (True Positive - TP). Model gagal sebanyak 591 kali (False Negative - FN), di mana balita yang sebenarnya stunting justru diprediksi tidak stunting.
+# Evaluasi model pada test data
+conf_matrix_svmradial <- confusionMatrix(predicted.values, data_test$stunting)
+conf_matrix_svmradial
+```
+```{r}
+# Menggunakan karnel polynomial
+svm_poly <- svm(stunting ~ ., data = data_train, kernel = "polynomial", cost = 100, gamma = 0.1)
+pred_poly <- predict(svm_poly, data_test)
 
-3. Kesimpulan: Model SVM memiliki kinerja baik dalam memprediksi kelas 0 dan 1. Namun diperlukan peninjauan ulang atau peningkatan model untuk meningkatkan kemampuan dalam memprediksi kelas.
+# Evaluasi model pada test data
+conf_matrix_svmpoly <- confusionMatrix(pred_poly, data_test$stunting)
+conf_matrix_svmpoly
+```
+```{r}
+# Menggunakan karnel linear
+svm_linear <- svm(stunting ~ ., data = data_train, kernel = "linear", cost = 100)
+pred_linear <- predict(svm_linear, data_test)
 
-# Model fine Tuning
+# Evaluasi model pada test data
+conf_matrix_svmlinear <- confusionMatrix(pred_linear, data_test$stunting)
+conf_matrix_svmlinear
+```
 
 ```{r}
-tuned.svm <-svm(stunting ~., data=train[1:7], kernel='radial', cost =100, gamma=0.1)
-predicted.values <- predict(tuned.svm, test[1:7])
-table(predicted.values, test$stunting)
+# Menggunakan karnel sigmoid
+svm_sigmoid <- svm(stunting ~ ., data = data_train, kernel = "sigmoid", cost = 100, gamma = 0.1)
+pred_sigmoid <- predict(svm_sigmoid, data_test)
+
+# Evaluasi model pada test data
+conf_matrix_svmsigmoid <- confusionMatrix(pred_sigmoid, data_test$stunting)
+conf_matrix_svmsigmoid
 ```
-Interpretasi:
-1. Baris pertama (0) menunjukkan situasi ketika sebenarnya adalah kelas 0. Model berhasil memprediksi dengan benar sebagai kelas 0 sebanyak 8570 kali, dan gagal sebanyak 147 kali.
-
-2. Baris kedua (1) menunjukkan situasi ketika sebenarnya adalah kelas 1. Model hanya berhasil memprediksi dengan benar sebagai kelas 1 sebanyak 8602 kali, sedangkan seharusnya adalah 147 kali.
-
-3. Kesimpulan: Model memiliki kinerja baik dalam memprediksi kelas 0, tetapi kinerja rendah dalam memprediksi kelas 1. Diperlukan peninjauan lebih lanjut atau peningkatan model untuk meningkatkan kemampuan dalam memprediksi kelas 1.
-
-# Evaluasi Metrik
-1. Accuracy (Akurasi)
-
+#6 Interpret Model
+Accuracy (Akurasi)
 $$Accuracy= (TP + TN) / (TP+ FP + FN + TN)$$
-```{r}
-accuracy <- (8570+8602)/(8570+0+147+8602)
-accuracy
-```
-
 2. Precision (Presisi)
-
 $$Precision= TP / (TP + FP)$$
-```{r}
-precision <- 8570/(8570+0)
-precision
-```
-
 3. Recall (Sensitivitas)
-
 $$Recall= TP/(TP + FN)$$
-```{r}
-recall <- 8570/(8570+147)
-recall
-```
-
 4. F1-Score
-
 $$F1-Score = 2×Precision × Recall/Precision + Recall$$
+
 ```{r}
-f1_score <- 2 * (precision * recall) / (precision + recall)
-f1_score
+# Random Forest
+accuracy_rf <- (8555 + 8357) / (8555 + 9 + 142 + 20051)
+accuracy_rf
+
 ```
+
+
