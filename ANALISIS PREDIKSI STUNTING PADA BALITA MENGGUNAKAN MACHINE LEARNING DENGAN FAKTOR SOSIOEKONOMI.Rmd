@@ -10,36 +10,33 @@ output: html_document
 ```{r}
 # Library yang berisi kumpulan packages untuk analisis data
 library(tidyverse)
+# library untuk manipulasi data
+library(dplyr)
+# library untuk manipulasi data tanggal
+library(lubridate)
 # library untuk menampilkan hasil statistik deskriptif
 library(summarytools)
+# library untuk visualisasi data
+library (ggplot2)
 #Mengabungkan visualisasi
 library(gridExtra)
 # library untuk membaca data dari file Excel (.xlsx)
 library(readxl)
-# library untuk membangun dan mengevaluasi model machine learning
 library(caret)
-# library untuk melakukan analisis multivariat
+#PCA
 library(FactoMineR)
-# library untuk visualisasi hasil analisis multivariat
+#visualisasi PCA
 library(factoextra)
-# library untuk membuat visualisasi matriks korelasi secara grafis
+#Correlation Matrix
 library(corrplot)
 # Visualisasi Correlation Matrix
 library(ggcorrplot)
-# library untuk Implementasi Random Forest yang lebih cepat dan efisien
 library(ranger)
-# library untuk membangun model Random Forest
 library(randomForest)
-# library untuk membuat kurva ROC dan menghitung AUC
 library(pROC)
-# library untuk melakukan analisis statistik berbasis bootstrap
 library(boot)
-# library untuk membagi data menjadi train dan test
 library(caTools)
-# library untuk implementasi Support Vector Machine (SVM)
 library(e1071)
-# library untuk mengetahui feature importance dari model svm
-library(iml)
 ```
 # 2. Obtain - Load Dataset
 ## a. Import Dataset
@@ -610,20 +607,6 @@ rf_model <- randomForest(stunting ~ ., data = data_train, importance = TRUE)
 print(rf_model)
 ```
 ```{r}
-# Melakukan Prediksi
-pred_rf  <- predict(rf_model, newdata = data_test, type = "class")
-
-# Evaluasi model pada test data
-conf_matrix_rf <- confusionMatrix(pred_rf, data_test$stunting)
-conf_matrix_rf
-
-# Menampilkan metrik tambahan untuk test data
-cat("Akurasi pada data test:", conf_matrix_rf$overall["Accuracy"], "\n")
-cat("Recall pada data test:", conf_matrix_rf$byClass["Sensitivity"], "\n")
-cat("Precision pada data test:", conf_matrix_rf$byClass["Precision"], "\n")
-cat("F1-score pada data test:", conf_matrix_rf$byClass["F1"], "\n")
-```
-```{r}
 # Plot pentingnya fitur
 varImpPlot(rf_model, main = "Feature Importance - Random Forest")
 
@@ -636,39 +619,115 @@ print(importance)
 ggplot(importance, aes(x = reorder(row.names(importance), MeanDecreaseGini), y = MeanDecreaseGini)) +
   geom_bar(stat = "identity", fill = "blue") +
   coord_flip() +
-  labs(title = "Feature Importance - Random Forest", x = "Faktor Sosioekonomi", y = "Tingkat Kepentingan")
+  labs(title = "Feature Importance - Random Forest",
+       x = "Faktor Sosioekonomi",
+       y = "Tingkat Kepentingan") +
+  theme_minimal()
 ```
 ```{r}
-# Hitung probabilitas prediksi
-probabilities_rf <- predict(rf_model, data_test, type = "prob")[,2]
+# Melakukan Prediksi
+pred_rf  <- predict(rf_model, newdata = data_test, type = "class")
 
-# ROC Curve dan AUC
-roc_curve <- roc(data_test$stunting, probabilities_rf)
-plot(roc_curve, col = "blue", main = "ROC Curve - Random Forest")
-auc(roc_curve)
+# Evaluasi confusion matrix
+conf_matrix_rf <- confusionMatrix(pred_rf, data_test$stunting)
+conf_matrix_rf
 ```
 ## Membangun Model SVM
 ```{r}
+# Membangun model svm
 svm_model <- svm(stunting ~., data = data_train)
+
+# Hasil model svm
 print(svm_model)
 ```
+```{r}
+# menggunakan karnel radial
+svm_radial <-svm(stunting ~., data = data_train, kernel = 'radial', cost = 100, gamma = 0.1)
 
+# Hasil model svm-karnel radial
+print(svm_radial)
+```
+```{r}
+# Menggunakan karnel polynomial
+svm_poly <- svm(stunting ~ ., data = data_train, kernel = "polynomial", cost = 100, gamma = 0.1)
+
+# Hasil model svm-karnel polynomial
+print(svm_poly)
+```
+```{r}
+# Menggunakan karnel linear
+svm_linear <- svm(stunting ~ ., data = data_train, kernel = "linear", cost = 100, gamma = 0.1)
+
+# Hasil model svm-karnel linear
+print(svm_linear)
+```
+```{r}
+# Menggunakan karnel sigmoid
+svm_sigmoid <- svm(stunting ~ ., data = data_train, kernel = "sigmoid", cost = 100, gamma = 0.1)
+
+# Hasil model svm-karnel sigmoid
+print(svm_sigmoid)
+```
+
+```{r}
+# Ambil koefisien svm
+coefs <- t(svm_model$coefs) %*% svm_model$SV
+importance <- as.vector(coefs)
+features <- names(data_train)[-which(names(data_train) == "stunting")]
+
+# Buat dataframe untuk visualisasi
+importance_df <- data.frame(
+  Feature = features,
+  Importance = abs(importance)
+)
+
+# Visualisasi
+ggplot(importance_df, aes(x = reorder(Feature, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  coord_flip() +
+  labs(title = "Feature Importance pada Model SVM",
+       x = "Faktor Sosioekonomi",
+       y = "Tingkat Kepentingan") +
+  theme_minimal()
+
+# Ambil koefisien dari model svm_radial fine tunning
+coefs_radial <- t(svm_radial$coefs) %*% svm_radial$SV
+importance_radial <- as.vector(coefs_radial)
+features <- names(data_train)[-which(names(data_train) == "stunting")]
+
+# Buat dataframe untuk visualisasi
+importance_radial_df <- data.frame(
+  Feature = features,
+  Importance = abs(importance_radial)
+)
+
+# Visualisasi
+ggplot(importance_radial_df, aes(x = reorder(Feature, Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "darkgreen") +
+  coord_flip() +
+  labs(title = "Feature Importance pada Model SVM\ndengan Kernel Radial Fine Tunning",
+       x = "Faktor Sosioekonomi",
+       y = "Tingkat Kepentingan") +
+  theme_minimal()
+```
 
 ```{r}
 # Melakukan prediksi
-pred_svm <- predict(svm_mode, data_test)
+pred_svm <- predict(svm_model, data_test)
 
 # Evaluasi model pada test data
 conf_matrix_svm <- confusionMatrix(pred_svm, data_test$stunting)
 conf_matrix_svm
 ```
+
+
+
 ```{r}
-# menggunakan karnel radial
-svm_radial <-svm(stunting ~., data = data_train, kernel = 'radial', cost = 100, gamma = 0.1)
-predicted.values <- predict(svm_radial, data_test)
+# Melakukan prediksi
+pred_radial <- predict(svm_radial, data_test)
 
 # Evaluasi model pada test data
-conf_matrix_svmradial <- confusionMatrix(predicted.values, data_test$stunting)
+conf_matrix_svmradial <- confusionMatrix(pred_radial, data_test$stunting)
 conf_matrix_svmradial
 ```
 ```{r}
@@ -701,7 +760,7 @@ conf_matrix_svmsigmoid
 ```
 #6 Interpret Model
 Accuracy (Akurasi)
-$$Accuracy= (TP + TN) / (TP+ FP + FN + TN)$$
+$$Accuracy = (TP + TN) / (TP+ FP + FN + TN)$$
 2. Precision (Presisi)
 $$Precision= TP / (TP + FP)$$
 3. Recall (Sensitivitas)
@@ -711,9 +770,35 @@ $$F1-Score = 2×Precision × Recall/Precision + Recall$$
 
 ```{r}
 # Random Forest
-accuracy_rf <- (8555 + 8357) / (8555 + 9 + 142 + 20051)
-accuracy_rf
+tp_rf = 8697
+fp_rf = 0
+fn_rf = 0
+tn_rf = 8621
 
+accuracy_rf <- (tp_rf + tn_rf) / (tp_rf + fp_rf + fn_rf + tn_rf)
+accuracy_rf
+precision_rf <- tp_rf/(tp_rf+fp_rf)
+precision_rf
+recall_rf <- tp_rf/(tp_rf+fn_rf)
+recall_rf
+f1_score_rf <- (2 * precision_rf * recall_rf)/ (precision_rf + recall_rf)
+f1_score_rf
+```
+```{r}
+# SVM
+tp_svm = 8555
+fp_svm = 9
+fn_svm = 142
+tn_svm = 8612
+
+accuracy_svm <- (tp_svm + tn_svm) / (tp_svm + fp_svm + fn_svm + tn_svm)
+accuracy_svm
+precision_svm <- tp_svm/(tp_svm+fp_svm)
+precision_svm
+recall_svm <- tp_svm/(tp_svm+fn_svm)
+recall_svm
+f1_score_svm <- (2 * precision_svm * recall_svm)/ (precision_svm + recall_svm)
+f1_score_svm
 ```
 
 
