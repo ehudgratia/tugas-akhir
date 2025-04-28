@@ -37,6 +37,7 @@ library(pROC)
 library(boot)
 library(caTools)
 library(e1071)
+library(reshape2)
 ```
 # 2. Obtain - Load Dataset
 ## a. Import Dataset
@@ -632,6 +633,22 @@ pred_rf  <- predict(rf_model, newdata = data_test, type = "class")
 conf_matrix_rf <- confusionMatrix(pred_rf, data_test$stunting)
 conf_matrix_rf
 ```
+```{r}
+# nilai asli (ground truth)
+nilai_asli_rf <- data_test$stunting
+
+df_rf <- data.frame(Nilai_Asli = nilai_asli_rf, Nilai_Prediksi = pred_rf)
+
+# Perbandingan Nilai Prediksi Random Forest dengan Nilai Asli
+ggplot(df_rf, aes(x = Nilai_Asli, y = Nilai_Prediksi)) +
+  geom_jitter(width = 0.2, height = 0.2, color = "blue", size = 2) +
+  labs(title = "Perbandingan Nilai Prediksi Random Forest dengan Nilai Asli",
+       x = "Nilai Asli (0 = Stunting Rendah, 1 = Stunting Tinggi)",
+       y = "Nilai Prediksi Random Forest") +
+  theme_minimal()
+```
+
+
 ## Membangun Model SVM
 ```{r}
 # Membangun model svm
@@ -730,6 +747,22 @@ pred_radial <- predict(svm_radial, data_test)
 conf_matrix_svmradial <- confusionMatrix(pred_radial, data_test$stunting)
 conf_matrix_svmradial
 ```
+```{r}
+# nilai asli (ground truth)
+nilai_asli_svm <- data_test$stunting
+
+df_svm <- data.frame(Nilai_Asli = nilai_asli_svm, Nilai_Prediksi = pred_radial)
+
+# Perbandingan Nilai Prediksi Random Forest dengan Nilai Asli
+ggplot(df_svm, aes(x = Nilai_Asli, y = Nilai_Prediksi)) +
+  geom_jitter(width = 0.2, height = 0.2, color = "blue", size = 2) +
+  labs(title = "Perbandingan Nilai Prediksi SVM dengan Nilai Asli",
+       x = "Nilai Asli (0 = Stunting Rendah, 1 = Stunting Tinggi)",
+       y = "Nilai Prediksi SVM") +
+  theme_minimal()
+```
+
+
 ```{r}
 # Menggunakan karnel polynomial
 svm_poly <- svm(stunting ~ ., data = data_train, kernel = "polynomial", cost = 100, gamma = 0.1)
