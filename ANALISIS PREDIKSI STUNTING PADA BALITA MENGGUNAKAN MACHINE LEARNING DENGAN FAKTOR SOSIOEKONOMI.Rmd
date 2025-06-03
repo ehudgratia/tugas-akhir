@@ -705,31 +705,36 @@ glimpse(test_final)
 ```
 # e. Membangun model RF
 ```{r}
-# default
+# Model default
 set.seed(123)
-rf_model <- randomForest(stunting ~ ., data = train_final)
+rf_model1 <- randomForest(stunting ~ ., data = train_final,
+                          ntree = 200,
+                          mtry = floor(sqrt(ncol(train_final)-1)),
+                          nodesize = 10,
+                          maxnodes = 20,
+                          importance = TRUE)
 
 # Prediksi & evaluasi
-pred_rf <- predict(rf_model, test_final)
-conf_matrix_rf <- confusionMatrix(pred_rf, test_final$stunting)
+pred_rf1 <- predict(rf_model1, test_final)
+conf_matrix_rf1 <- confusionMatrix(pred_rf1, test_final$stunting)
 
 ## hasil
-print(rf_model)
-print(conf_matrix_rf)
+print(rf_model1)
+print(conf_matrix_rf1)
 
 # Ekstrak confusion matrix dari caret
-cm_rfmodel <- as.data.frame(conf_matrix_rf$table)
+cm_rfmodel1 <- as.data.frame(conf_matrix_rf1$table)
 
 # Ganti nama kolom supaya konsisten
-colnames(cm_rfmodel) <- c("Prediction", "Reference", "Freq")
+colnames(cm_rfmodel1) <- c("Prediction", "Reference", "Freq")
 
 # Plot pakai ggplot2
-ggplot(cm_rfmodel, aes(x = Reference, y = Prediction, fill = Freq)) +
+ggplot(cm_rfmodel1, aes(x = Reference, y = Prediction, fill = Freq)) +
   geom_tile(color = "black") +
   geom_text(aes(label = Freq), size = 6) +
   scale_fill_gradient(low = "white", high = "skyblue") +
   labs(
-    title = "Confusion Matrix - rf_model",
+    title = "Confusion Matrix - rf_model1",
     x = "Actual (Reference)",
     y = "Predicted",
     fill = "Count"
@@ -737,14 +742,16 @@ ggplot(cm_rfmodel, aes(x = Reference, y = Prediction, fill = Freq)) +
   theme_minimal() +
   coord_fixed()
 ```
-Terindikasi overfitting dikarenakan hasil dari confuision matrik terlalu sempurna
 ```{r}
-# menggunakan tuning parameter
+# Model 2: Lebih teratur dengan regularisasi
 set.seed(123)
-rf_model2 <- randomForest(stunting ~ ., data = train_final, ntree = 200,
-  mtry = floor(sqrt(ncol(train_final)-1)), nodesize = 10, maxnodes = 20,
-  importance = TRUE
-)
+rf_model2 <- randomForest(stunting ~ ., data = train_final, 
+                         ntree = 300,  # Sedikit mengurangi jumlah pohon
+                         mtry = floor(sqrt(ncol(train_final)-1)),
+                         nodesize = 15,  # Ukuran node lebih besar
+                         maxnodes = 30,  # Batas node lebih longgar
+                         sampsize = 0.7*nrow(train_final), # Subsample data
+                         importance = TRUE)
 
 # Prediksi & evaluasi
 pred_rf2 <- predict(rf_model2, test_final)
@@ -774,33 +781,76 @@ ggplot(cm_rfmodel2, aes(x = Reference, y = Prediction, fill = Freq)) +
   theme_minimal() +
   coord_fixed()
 ```
-## f. Membangun Model SVM
 ```{r}
-# default
+# Model 3: Konfigurasi sangat konservatif
 set.seed(123)
-svm_model <- svm(stunting ~ ., data = train_final)
+rf_model3 <- randomForest(stunting ~ ., data = train_final, 
+                         ntree = 150, 
+                         mtry = max(floor(ncol(train_final)/3), 3), 
+                         nodesize = 25, 
+                         maxnodes = 15,
+                         strata = train_final$stunting,  # Stratified sampling
+                         sampsize = c("0" = 500, "1" = 500),  # Balanced subsample
+                         importance = TRUE)
 
-# Prediksi dan Evaluasi
-pred_svm <- predict(svm_model, test_final)
-conf_matrix_svm <- confusionMatrix(pred_svm, test_final$stunting)
+# Prediksi & evaluasi
+pred_rf3 <- predict(rf_model3, test_final)
+conf_matrix_rf3 <- confusionMatrix(pred_rf3, test_final$stunting)
 
-# Hasil model svm
-print(svm_model)
-print(conf_matrix_svm)
+## hasil
+print(rf_model3)
+print(conf_matrix_rf3)
 
 # Ekstrak confusion matrix dari caret
-cm_svmmodel <- as.data.frame(conf_matrix_svm$table)
+cm_rfmodel3 <- as.data.frame(conf_matrix_rf3$table)
 
 # Ganti nama kolom supaya konsisten
-colnames(cm_svmmodel) <- c("Prediction", "Reference", "Freq")
+colnames(cm_rfmodel3) <- c("Prediction", "Reference", "Freq")
 
 # Plot pakai ggplot2
-ggplot(cm_svmmodel, aes(x = Reference, y = Prediction, fill = Freq)) +
+ggplot(cm_rfmodel3, aes(x = Reference, y = Prediction, fill = Freq)) +
   geom_tile(color = "black") +
   geom_text(aes(label = Freq), size = 6) +
   scale_fill_gradient(low = "white", high = "skyblue") +
   labs(
-    title = "Confusion Matrix - svm_model",
+    title = "Confusion Matrix - rf_model3",
+    x = "Actual (Reference)",
+    y = "Predicted",
+    fill = "Count"
+  ) +
+  theme_minimal() +
+  coord_fixed()
+```
+
+## f. Membangun Model SVM
+```{r}
+# Model default
+svm_model1 <-svm(stunting ~., data =train_final,
+                 kernel='radial',
+                 cost = 100,
+                 gamma = 0.1)
+
+# Prediksi dan Evaluasi
+pred_svm1 <- predict(svm_model1, test_final)
+conf_matrix_svm1 <- confusionMatrix(pred_svm1, test_final$stunting)
+
+# Hasil model svm
+print(svm_model1)
+print(conf_matrix_svm1)
+
+# Ekstrak confusion matrix dari caret
+cm_svmmodel1 <- as.data.frame(conf_matrix_svm1$table)
+
+# Ganti nama kolom supaya konsisten
+colnames(cm_svmmodel1) <- c("Prediction", "Reference", "Freq")
+
+# Plot pakai ggplot2
+ggplot(cm_svmmodel1, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = Freq), size = 6) +
+  scale_fill_gradient(low = "white", high = "skyblue") +
+  labs(
+    title = "Confusion Matrix - svm_model1",
     x = "Actual (Reference)",
     y = "Predicted",
     fill = "Count"
@@ -809,9 +859,12 @@ ggplot(cm_svmmodel, aes(x = Reference, y = Prediction, fill = Freq)) +
   coord_fixed()
 ```
 ```{r}
-# Dengan tuning parameter
-svm_model2 <-svm(stunting ~., data =train_final, kernel='radial',
-                 cost = 100, gamma = 0.1)
+# Model 2: Kernel radial dengan regularisasi lebih ketat
+svm_model2 <- svm(stunting ~., data = train_final, 
+                 kernel = 'radial',
+                 cost = 10,  # Regularisasi lebih kuat
+                 gamma = 0.01,  # Pengaruh titik data lebih kecil
+                 class.weights = c("0" = 1, "1" = 2))  # Menangani ketidakseimbangan kelas
 
 # Prediksi dan Evaluasi
 pred_svm2 <- predict(svm_model2, test_final)
@@ -841,33 +894,70 @@ ggplot(cm_svmmodel2, aes(x = Reference, y = Prediction, fill = Freq)) +
   theme_minimal() +
   coord_fixed()
 ```
-`
+```{r}
+# Model 3: Kernel polynomial dengan regularisasi
+svm_model3 <- svm(stunting ~., data = train_final, 
+                 kernel = 'polynomial', 
+                 cost = 0.5,  # Margin lebih lebar
+                 scale = TRUE,  # Scaling otomatis
+                 class.weights = c("0" = 1, "1" = 1.5))  # Bobot kelas
+
+# Prediksi dan Evaluasi
+pred_svm3 <- predict(svm_model3, test_final)
+conf_matrix_svm3 <- confusionMatrix(pred_svm3, test_final$stunting)
+
+# Hasil model svm
+print(svm_model3)
+print(conf_matrix_svm3)
+
+# Ekstrak confusion matrix dari caret
+cm_svmmodel3 <- as.data.frame(conf_matrix_svm3$table)
+
+# Ganti nama kolom supaya konsisten
+colnames(cm_svmmodel3) <- c("Prediction", "Reference", "Freq")
+
+# Plot pakai ggplot2
+ggplot(cm_svmmodel3, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = Freq), size = 6) +
+  scale_fill_gradient(low = "white", high = "skyblue") +
+  labs(
+    title = "Confusion Matrix - svm_model3",
+    x = "Actual (Reference)",
+    y = "Predicted",
+    fill = "Count"
+  ) +
+  theme_minimal() +
+  coord_fixed()
+
+```
+
 
 # 5. Interpret
 ```{r}
 # Extract Metrics
-metrics_rf <- conf_matrix_rf$byClass[c("Precision", "Recall", "F1")]
-accuracy_rf <- conf_matrix_rf$overall["Accuracy"]
+metrics_rf1 <- conf_matrix_rf1$byClass[c("Precision", "Recall", "F1")]
+accuracy_rf1 <- conf_matrix_rf1$overall["Accuracy"]
 
-metrics_svm <- conf_matrix_svm$byClass[c("Precision", "Recall", "F1")]
-accuracy_svm <- conf_matrix_svm$overall["Accuracy"]
+metrics_svm1 <- conf_matrix_svm1$byClass[c("Precision", "Recall", "F1")]
+accuracy_svm1 <- conf_matrix_svm1$overall["Accuracy"]
 
 # satukan datata
-metrics_df <- tibble(
-  Metric = c("Accuracy", "Precision", "Recall", "F1-score"),
-  RF = c(accuracy_rf, metrics_rf),
-  SVM = c(accuracy_svm, metrics_svm)
+metrics_df1 <- tibble(
+  Metric = c("Accuracy", "Recall", "Precision", "F1-score"),
+  RF = c(accuracy_rf1, metrics_rf1),
+  SVM = c(accuracy_svm1, metrics_svm1)
 ) %>%
   pivot_longer(cols = c(RF, SVM), names_to = "Model", values_to = "Value")
 
 # Visualisasi
-ggplot(metrics_df, aes(x = Metric, y = Value, fill = Model)) +
+ggplot(metrics_df1, aes(x = Metric, y = Value, fill = Model)) +
   geom_col(position = position_dodge(width = 0.7), width = 0.6) +
   geom_text(aes(label = round(Value, 3)), 
             position = position_dodge(width = 0.7), 
             vjust = -0.5, size = 3) +
   scale_fill_manual(values = c("RF" = "#1b9e77", "SVM" = "#d95f02")) +
-  labs(title = "Perbandingan Kinerja Model rf_model vs svm_model",
+  labs(title = "Perbandingan Kinerja Model rf_model1 vs svm_model1",
        y = "Nilai Metrik", x = "Metrik Evaluasi") +
   theme_minimal()
 ```
@@ -899,44 +989,72 @@ ggplot(metrics_df2, aes(x = Metric, y = Value, fill = Model)) +
   theme_minimal()
 ```
 ```{r}
+# Extract Metrics
+metrics_rf3 <- conf_matrix_rf3$byClass[c("Precision", "Recall", "F1")]
+accuracy_rf3 <- conf_matrix_rf3$overall["Accuracy"]
+
+metrics_svm3 <- conf_matrix_svm3$byClass[c("Precision", "Recall", "F1")]
+accuracy_svm3 <- conf_matrix_svm3$overall["Accuracy"]
+
+# satukan datata
+metrics_df3 <- tibble(
+  Metric = c("Accuracy", "Recall", "Precision", "F1-score"),
+  RF = c(accuracy_rf3, metrics_rf3),
+  SVM = c(accuracy_svm3, metrics_svm3)
+) %>%
+  pivot_longer(cols = c(RF, SVM), names_to = "Model", values_to = "Value")
+
+# Visualisasi
+ggplot(metrics_df3, aes(x = Metric, y = Value, fill = Model)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  geom_text(aes(label = round(Value, 3)), 
+            position = position_dodge(width = 0.7), 
+            vjust = -0.5, size = 3) +
+  scale_fill_manual(values = c("RF" = "#1b9e77", "SVM" = "#d95f02")) +
+  labs(title = "Perbandingan Kinerja Model rf_model3 vs svm_model3",
+       y = "Nilai Metrik", x = "Metrik Evaluasi") +
+  theme_minimal()
+```
+
+```{r}
 # Buat prediktor untuk model RF
-predictor_rf <- Predictor$new(
-  model = rf_model,
+predictor_rf1 <- Predictor$new(
+  model = rf_model1,
   data = test_final[, -which(names(test_final) == "stunting")],
   y = test_final$stunting
 )
 
 # Hitung Permutation Importance
-imp_rf <- FeatureImp$new(predictor_rf, loss = "ce")
+imp_rf1 <- FeatureImp$new(predictor_rf1, loss = "ce")
 
 # Buat objek prediktor
-predictor_svm <- Predictor$new(
-  model = svm_model,
+predictor_svm1 <- Predictor$new(
+  model = svm_model1,
   data = test_final[, -which(names(test_final) == "stunting")],  # semua fitur
   y = test_final$stunting
 )
 
 # Hitung feature importance dengan Permutation
-imp_svm <- FeatureImp$new(predictor_svm, loss = "ce")
+imp_svm1 <- FeatureImp$new(predictor_svm1, loss = "ce")
 
 # Ambil hasil importance dari model
-df_rf <- as.data.frame(imp_rf$results)
-df_svm <- as.data.frame(imp_svm$results)
+df_rf1 <- as.data.frame(imp_rf1$results)
+df_svm1 <- as.data.frame(imp_svm1$results)
 
 # Contoh plot importance untuk Random Forest
-p39 <- ggplot(df_rf, aes(x = reorder(feature, importance), y = importance)) +
+p39 <- ggplot(df_rf1, aes(x = reorder(feature, importance), y = importance)) +
   geom_bar(stat = "identity", fill = "blue") +
   coord_flip() +
-  labs(title = "Permutation Feature Importance\nrf_model",
+  labs(title = "Permutation\nFeature Importance\nrf_model1",
        x = "Fitur",
        y = "Importance (Penurunan Akurasi)") +
   theme_minimal()
 
 # Contoh plot importance untuk SVM
-p40 <- ggplot(df_svm, aes(x = reorder(feature, importance), y = importance)) +
+p40 <- ggplot(df_svm1, aes(x = reorder(feature, importance), y = importance)) +
   geom_bar(stat = "identity", fill = "blue") +
   coord_flip() +
-  labs(title = "Permutation Feature Importance\nsvm_model",
+  labs(title = "Permutation\nFeature Importance\nsvm_model1",
        x = "Fitur",
        y = "Importance (Penurunan Akurasi)") +
   theme_minimal()
@@ -973,7 +1091,7 @@ df_svm2 <- as.data.frame(imp_svm2$results)
 p41 <- ggplot(df_rf2, aes(x = reorder(feature, importance), y = importance)) +
   geom_bar(stat = "identity", fill = "blue") +
   coord_flip() +
-  labs(title = "Permutation Feature Importance\nrf_model2",
+  labs(title = "Permutation\nFeature Importance\nrf_model2",
        x = "Fitur",
        y = "Importance (Penurunan Akurasi)") +
   theme_minimal()
@@ -982,13 +1100,60 @@ p41 <- ggplot(df_rf2, aes(x = reorder(feature, importance), y = importance)) +
 p42 <- ggplot(df_svm2, aes(x = reorder(feature, importance), y = importance)) +
   geom_bar(stat = "identity", fill = "blue") +
   coord_flip() +
-  labs(title = "Permutation Feature Importance\nsvm_model2",
+  labs(title = "Permutation\nFeature Importance\nsvm_model2",
        x = "Fitur",
        y = "Importance (Penurunan Akurasi)") +
   theme_minimal()
 
 grid.arrange(p41, p42, ncol = 2)
 ```
+
+```{r}
+# Buat prediktor untuk model RF
+predictor_rf3 <- Predictor$new(
+  model = rf_model3,
+  data = test_final[, -which(names(test_final) == "stunting")],
+  y = test_final$stunting
+)
+
+# Hitung Permutation Importance
+imp_rf3 <- FeatureImp$new(predictor_rf3, loss = "ce")
+
+# Buat objek prediktor
+predictor_svm3 <- Predictor$new(
+  model = svm_model3,
+  data = test_final[, -which(names(test_final) == "stunting")],  # semua fitur
+  y = test_final$stunting
+)
+
+# Hitung feature importance dengan Permutation
+imp_svm3 <- FeatureImp$new(predictor_svm3, loss = "ce")
+
+# Ambil hasil importance dari model
+df_rf3 <- as.data.frame(imp_rf3$results)
+df_svm3 <- as.data.frame(imp_svm3$results)
+
+# Contoh plot importance untuk Random Forest
+p43 <- ggplot(df_rf3, aes(x = reorder(feature, importance), y = importance)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  coord_flip() +
+  labs(title = "Permutation\nFeature Importance\nrf_model3",
+       x = "Fitur",
+       y = "Importance (Penurunan Akurasi)") +
+  theme_minimal()
+
+# Contoh plot importance untuk SVM
+p44 <- ggplot(df_svm2, aes(x = reorder(feature, importance), y = importance)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  coord_flip() +
+  labs(title = "Permutation\nFeature Importance\nsvm_model3",
+       x = "Fitur",
+       y = "Importance (Penurunan Akurasi)") +
+  theme_minimal()
+
+grid.arrange(p43, p44, ncol = 2)
+```
+
 
 
 
