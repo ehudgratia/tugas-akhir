@@ -1153,14 +1153,3 @@ p44 <- ggplot(df_svm2, aes(x = reorder(feature, importance), y = importance)) +
 
 grid.arrange(p43, p44, ncol = 2)
 ```
-
-
-
-
-
-
-
-
-
-
-
