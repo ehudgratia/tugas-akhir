@@ -929,137 +929,110 @@ ggplot(cm_svmmodel3, aes(x = Reference, y = Prediction, fill = Freq)) +
   ) +
   theme_minimal() +
   coord_fixed()
-
 ```
-
 
 # 5. Interpret
 ```{r}
-# Extract Metrics
+# Extract Metrics RF
 metrics_rf1 <- conf_matrix_rf1$byClass[c("Precision", "Recall", "F1")]
 accuracy_rf1 <- conf_matrix_rf1$overall["Accuracy"]
 
+metrics_rf2 <- conf_matrix_rf2$byClass[c("Precision", "Recall", "F1")]
+accuracy_rf2 <- conf_matrix_rf2$overall["Accuracy"]
+
+metrics_rf3 <- conf_matrix_rf3$byClass[c("Precision", "Recall", "F1")]
+accuracy_rf3 <- conf_matrix_rf3$overall["Accuracy"]
+
+# Gabungkan semua metrik ke dalam satu tibble
+metrics_rf <- bind_rows(
+  tibble(Model = "rf_model1",
+         Metric = c("Recall", "Precision", "F1", "Accuracy"),
+         Value = c(conf_matrix_rf1$byClass[c("Precision", "Recall", "F1")],
+                   conf_matrix_rf1$overall["Accuracy"])),
+  tibble(Model = "rf_model2",
+         Metric = c("Recall", "Precision", "F1", "Accuracy"),
+         Value = c(conf_matrix_rf2$byClass[c("Precision", "Recall", "F1")],
+                   conf_matrix_rf2$overall["Accuracy"])),
+  tibble(Model = "rf_model3",
+         Metric = c("Recall", "Precision", "F1", "Accuracy"),
+         Value = c(conf_matrix_rf3$byClass[c("Precision", "Recall", "F1")],
+                   conf_matrix_rf3$overall["Accuracy"]))
+)
+
+# Visualisasi 
+ggplot(metrics_rf, aes(x = Metric, y = Value, fill = Model)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), width = 0.7) +
+  geom_text(aes(label = round(Value, 3)), 
+            position = position_dodge(0.8),
+            vjust = -0.5, 
+            size = 3) +
+  labs(title = "Perbandingan Model Random Forest",
+       y = "Nilai Metrik",
+       x = "Metrix Evaluasi",
+       fill = "Model") +
+  theme_minimal()
+```
+
+```{r}
+# Extract Metrics SVM
 metrics_svm1 <- conf_matrix_svm1$byClass[c("Precision", "Recall", "F1")]
 accuracy_svm1 <- conf_matrix_svm1$overall["Accuracy"]
 
-# satukan datata
-metrics_df1 <- tibble(
+metrics_svm2 <- conf_matrix_svm2$byClass[c("Precision", "Recall", "F1")]
+accuracy_svm2 <- conf_matrix_svm2$overall["Accuracy"]
+
+metrics_svm3 <- conf_matrix_svm3$byClass[c("Precision", "Recall", "F1")]
+accuracy_svm3 <- conf_matrix_svm3$overall["Accuracy"]
+
+# Gabungkan semua metrik ke dalam satu tibble
+metrics_svm <- bind_rows(
+  tibble(Model = "svm_model1",
+         Metric = c("Recall", "Precision", "F1", "Accuracy"),
+         Value = c(conf_matrix_svm1$byClass[c("Precision", "Recall", "F1")],
+                   conf_matrix_svm1$overall["Accuracy"])),
+  tibble(Model = "svm_model2",
+         Metric = c("Recall", "Precision", "F1", "Accuracy"),
+         Value = c(conf_matrix_svm2$byClass[c("Precision", "Recall", "F1")],
+                   conf_matrix_svm2$overall["Accuracy"])),
+  tibble(Model = "svm_model3",
+         Metric = c("Recall", "Precision", "F1", "Accuracy"),
+         Value = c(conf_matrix_svm3$byClass[c("Precision", "Recall", "F1")],
+                   conf_matrix_svm3$overall["Accuracy"]))
+)
+
+# Visualisasi 
+ggplot(metrics_svm, aes(x = Metric, y = Value, fill = Model)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), width = 0.7) +
+  geom_text(aes(label = round(Value, 3)), 
+            position = position_dodge(0.8),
+            vjust = -0.5, 
+            size = 3) +
+  labs(title = "Perbandingan Model SVM",
+       y = "Nilai Metrik",
+       x = "Metrix Evaluasi",
+       fill = "Model") +
+  theme_minimal()
+```
+```{r}
+# RF vs SVM
+metrics_rf_svm <- tibble(
   Metric = c("Accuracy", "Recall", "Precision", "F1-score"),
-  RF = c(accuracy_rf1, metrics_rf1),
+  RF = c(accuracy_rf2, metrics_rf2),
   SVM = c(accuracy_svm1, metrics_svm1)
 ) %>%
   pivot_longer(cols = c(RF, SVM), names_to = "Model", values_to = "Value")
 
 # Visualisasi
-ggplot(metrics_df1, aes(x = Metric, y = Value, fill = Model)) +
+ggplot(metrics_rf_svm, aes(x = Metric, y = Value, fill = Model)) +
   geom_col(position = position_dodge(width = 0.7), width = 0.6) +
   geom_text(aes(label = round(Value, 3)), 
             position = position_dodge(width = 0.7), 
             vjust = -0.5, size = 3) +
   scale_fill_manual(values = c("RF" = "#1b9e77", "SVM" = "#d95f02")) +
-  labs(title = "Perbandingan Kinerja Model rf_model1 vs svm_model1",
-       y = "Nilai Metrik", x = "Metrik Evaluasi") +
+  labs(title = "Perbandingan Kinerja Random Forest vs SVM",
+       y = "Nilai Metrik",
+       x = "Metrik Evaluasi") +
   theme_minimal()
-```
-```{r}
-# Extract Metrics
-metrics_rf2 <- conf_matrix_rf2$byClass[c("Precision", "Recall", "F1")]
-accuracy_rf2 <- conf_matrix_rf2$overall["Accuracy"]
-
-metrics_svm2 <- conf_matrix_svm2$byClass[c("Precision", "Recall", "F1")]
-accuracy_svm2 <- conf_matrix_svm2$overall["Accuracy"]
-
-# satukan datata
-metrics_df2 <- tibble(
-  Metric = c("Accuracy", "Recall", "Precision", "F1-score"),
-  RF = c(accuracy_rf2, metrics_rf2),
-  SVM = c(accuracy_svm2, metrics_svm2)
-) %>%
-  pivot_longer(cols = c(RF, SVM), names_to = "Model", values_to = "Value")
-
-# Visualisasi
-ggplot(metrics_df2, aes(x = Metric, y = Value, fill = Model)) +
-  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
-  geom_text(aes(label = round(Value, 3)), 
-            position = position_dodge(width = 0.7), 
-            vjust = -0.5, size = 3) +
-  scale_fill_manual(values = c("RF" = "#1b9e77", "SVM" = "#d95f02")) +
-  labs(title = "Perbandingan Kinerja Model rf_model2 vs svm_model2",
-       y = "Nilai Metrik", x = "Metrik Evaluasi") +
-  theme_minimal()
-```
-```{r}
-# Extract Metrics
-metrics_rf3 <- conf_matrix_rf3$byClass[c("Precision", "Recall", "F1")]
-accuracy_rf3 <- conf_matrix_rf3$overall["Accuracy"]
-
-metrics_svm3 <- conf_matrix_svm3$byClass[c("Precision", "Recall", "F1")]
-accuracy_svm3 <- conf_matrix_svm3$overall["Accuracy"]
-
-# satukan datata
-metrics_df3 <- tibble(
-  Metric = c("Accuracy", "Recall", "Precision", "F1-score"),
-  RF = c(accuracy_rf3, metrics_rf3),
-  SVM = c(accuracy_svm3, metrics_svm3)
-) %>%
-  pivot_longer(cols = c(RF, SVM), names_to = "Model", values_to = "Value")
-
-# Visualisasi
-ggplot(metrics_df3, aes(x = Metric, y = Value, fill = Model)) +
-  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
-  geom_text(aes(label = round(Value, 3)), 
-            position = position_dodge(width = 0.7), 
-            vjust = -0.5, size = 3) +
-  scale_fill_manual(values = c("RF" = "#1b9e77", "SVM" = "#d95f02")) +
-  labs(title = "Perbandingan Kinerja Model rf_model3 vs svm_model3",
-       y = "Nilai Metrik", x = "Metrik Evaluasi") +
-  theme_minimal()
-```
-
-```{r}
-# Buat prediktor untuk model RF
-predictor_rf1 <- Predictor$new(
-  model = rf_model1,
-  data = test_final[, -which(names(test_final) == "stunting")],
-  y = test_final$stunting
-)
-
-# Hitung Permutation Importance
-imp_rf1 <- FeatureImp$new(predictor_rf1, loss = "ce")
-
-# Buat objek prediktor
-predictor_svm1 <- Predictor$new(
-  model = svm_model1,
-  data = test_final[, -which(names(test_final) == "stunting")],  # semua fitur
-  y = test_final$stunting
-)
-
-# Hitung feature importance dengan Permutation
-imp_svm1 <- FeatureImp$new(predictor_svm1, loss = "ce")
-
-# Ambil hasil importance dari model
-df_rf1 <- as.data.frame(imp_rf1$results)
-df_svm1 <- as.data.frame(imp_svm1$results)
-
-# Contoh plot importance untuk Random Forest
-p39 <- ggplot(df_rf1, aes(x = reorder(feature, importance), y = importance)) +
-  geom_bar(stat = "identity", fill = "blue") +
-  coord_flip() +
-  labs(title = "Permutation\nFeature Importance\nrf_model1",
-       x = "Fitur",
-       y = "Importance (Penurunan Akurasi)") +
-  theme_minimal()
-
-# Contoh plot importance untuk SVM
-p40 <- ggplot(df_svm1, aes(x = reorder(feature, importance), y = importance)) +
-  geom_bar(stat = "identity", fill = "blue") +
-  coord_flip() +
-  labs(title = "Permutation\nFeature Importance\nsvm_model1",
-       x = "Fitur",
-       y = "Importance (Penurunan Akurasi)") +
-  theme_minimal()
-
-grid.arrange(p39, p40, ncol = 2)
 ```
 
 ```{r}
@@ -1070,86 +1043,41 @@ predictor_rf2 <- Predictor$new(
   y = test_final$stunting
 )
 
-# Hitung Permutation Importance
-imp_rf2 <- FeatureImp$new(predictor_rf, loss = "ce")
-
-# Buat objek prediktor
-predictor_svm2 <- Predictor$new(
-  model = svm_model2,
+# Buat objek prediktor SVM
+predictor_svm1 <- Predictor$new(
+  model = svm_model1,
   data = test_final[, -which(names(test_final) == "stunting")],  # semua fitur
   y = test_final$stunting
 )
 
-# Hitung feature importance dengan Permutation
-imp_svm2 <- FeatureImp$new(predictor_svm2, loss = "ce")
+# feature importance dengan Permutation
+imp_rf2 <- FeatureImp$new(predictor_rf2, loss = "ce", compare = "difference")
+imp_svm1 <- FeatureImp$new(predictor_svm1, loss = "ce", compare = "difference")
+
 
 # Ambil hasil importance dari model
 df_rf2 <- as.data.frame(imp_rf2$results)
-df_svm2 <- as.data.frame(imp_svm2$results)
+df_svm1 <- as.data.frame(imp_svm1$results)
 
-# Contoh plot importance untuk Random Forest
-p41 <- ggplot(df_rf2, aes(x = reorder(feature, importance), y = importance)) +
+# importance untuk Random Forest
+p39 <- ggplot(df_rf2, aes(x = reorder(feature, importance), y = importance)) +
   geom_bar(stat = "identity", fill = "blue") +
   coord_flip() +
-  labs(title = "Permutation\nFeature Importance\nrf_model2",
+  labs(title = "Permutation\nFeature Importance\nRandom Forest",
        x = "Fitur",
        y = "Importance (Penurunan Akurasi)") +
   theme_minimal()
 
-# Contoh plot importance untuk SVM
-p42 <- ggplot(df_svm2, aes(x = reorder(feature, importance), y = importance)) +
+# importance untuk SVM
+p40 <- ggplot(df_svm1, aes(x = reorder(feature, importance), y = importance)) +
   geom_bar(stat = "identity", fill = "blue") +
   coord_flip() +
-  labs(title = "Permutation\nFeature Importance\nsvm_model2",
-       x = "Fitur",
-       y = "Importance (Penurunan Akurasi)") +
+  labs(
+    title = "Permutation\nFeature Importance\nSVM",
+    x = "Fitur",
+    y = "Importance (Penurunan Akurasi)"
+  ) +
   theme_minimal()
 
-grid.arrange(p41, p42, ncol = 2)
-```
-
-```{r}
-# Buat prediktor untuk model RF
-predictor_rf3 <- Predictor$new(
-  model = rf_model3,
-  data = test_final[, -which(names(test_final) == "stunting")],
-  y = test_final$stunting
-)
-
-# Hitung Permutation Importance
-imp_rf3 <- FeatureImp$new(predictor_rf3, loss = "ce")
-
-# Buat objek prediktor
-predictor_svm3 <- Predictor$new(
-  model = svm_model3,
-  data = test_final[, -which(names(test_final) == "stunting")],  # semua fitur
-  y = test_final$stunting
-)
-
-# Hitung feature importance dengan Permutation
-imp_svm3 <- FeatureImp$new(predictor_svm3, loss = "ce")
-
-# Ambil hasil importance dari model
-df_rf3 <- as.data.frame(imp_rf3$results)
-df_svm3 <- as.data.frame(imp_svm3$results)
-
-# Contoh plot importance untuk Random Forest
-p43 <- ggplot(df_rf3, aes(x = reorder(feature, importance), y = importance)) +
-  geom_bar(stat = "identity", fill = "blue") +
-  coord_flip() +
-  labs(title = "Permutation\nFeature Importance\nrf_model3",
-       x = "Fitur",
-       y = "Importance (Penurunan Akurasi)") +
-  theme_minimal()
-
-# Contoh plot importance untuk SVM
-p44 <- ggplot(df_svm2, aes(x = reorder(feature, importance), y = importance)) +
-  geom_bar(stat = "identity", fill = "blue") +
-  coord_flip() +
-  labs(title = "Permutation\nFeature Importance\nsvm_model3",
-       x = "Fitur",
-       y = "Importance (Penurunan Akurasi)") +
-  theme_minimal()
-
-grid.arrange(p43, p44, ncol = 2)
+grid.arrange(p39, p40, ncol = 2)
 ```
