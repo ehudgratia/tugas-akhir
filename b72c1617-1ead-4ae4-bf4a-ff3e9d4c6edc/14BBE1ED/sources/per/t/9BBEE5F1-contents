@@ -1,0 +1,993 @@
+---
+title: ANALISIS PREDIKSI STUNTING PADA BALITA MENGGUNAKAN MACHINE LEARNING DENGAN   FAKTOR
+  SOSIOEKONOMI
+author: "Andre Daniel Sitinjak & Ehud Gratia Manullang"
+date: "2025-04-12"
+output: html_document
+---
+
+# Install Packages
+```{r}
+# Library yang berisi kumpulan packages untuk analisis data
+library(tidyverse)
+# library untuk manipulasi data
+library(dplyr)
+# library untuk menampilkan hasil statistik deskriptif
+library(summarytools)
+# library untuk visualisasi data
+library (ggplot2)
+#Mengabungkan visualisasi
+library(gridExtra)
+# library untuk membaca data dari file Excel (.xlsx)
+library(readxl)
+library(caret)
+#Correlation Matrix
+library(corrplot)
+# Visualisasi Correlation Matrix
+library(ggcorrplot)
+library(ranger)
+library(randomForest)
+library(pROC)
+library(boot)
+library(caTools)
+library(e1071)
+library(reshape2)
+library(iml)
+library(mlr) 
+library(FSelectorRcpp)
+```
+# 1. Obtain
+## A. Import Dataset
+```{r}
+stunting <- read_excel("Dataset/stunting.xlsx")
+stunting
+```
+# 2. Scrup Data
+## A. Melihat struktur Data
+```{r}
+#Menampilkan struktur data
+glimpse(stunting)
+```
+## B. Mengkonversi data ke tipe numerik
+```{r}
+# Melakukan Kelas Biner Terhadap Variabel Kategorial
+data_transform <- stunting %>%
+  mutate(umur_balita = case_when(umur_balita == "0-23 bulan" ~ 0, umur_balita == "0-59 bulan" ~ 1,),
+    tinggi_balita = case_when(tinggi_balita == "Sangat Pendek" ~ 0, tinggi_balita == "Pendek" ~ 1,),
+    status_gizi = case_when(status_gizi == "Gizi Buruk" ~ 0, status_gizi == "Gizi Kurang" ~ 1,),
+    daerah = case_when(daerah == "Perkotaan" ~ 0, daerah == "Perdesaan" ~ 1,),
+    jenis_gdp = case_when(jenis_gdp == "Harga berlaku" ~ 0, jenis_gdp == "Harga konstan 2010" ~ 1,),
+    status_idm = case_when(status_idm == "Sangat Tertinggal" ~ 0, status_idm == "Tertinggal" ~ 1,
+      status_idm == "Berkembang" ~ 2, status_idm == "Maju" ~ 3, status_idm == "Mandiri" ~ 4,))
+
+glimpse(data_transform)
+```
+## c. Menghapus data kosong (missing value)
+```{r}
+# Menampilkan jumlah data missing value
+colSums(is.na(data_transform))
+```
+Dari beberapa variabel, terdapat 6 variabel yang memiliki nilai kosong (missing value) yaitu jumlah_balita, persentase_stunting, idm,
+status_idm memiliki 2048 missing value. Persentase missing value terhadap total data sebesar 3%. kemudian pada variabel 
+persentase_tinggi_balita sebanyak 128 missing value, Persentase missing value terhadap total data sebesar 0,002%. lalu variabel
+persentase_penduduk_miskin sebanyak 1024 missing value, Persentase missing value terhadap total data sebesar 0,01%. Yang dapat disimpulkan
+jika missing value di bawah 10% maka data akan di hapus.
+```{r}
+# Hapus data NA's
+data_clean <- na.omit(data_transform)
+colSums(is.na(data_clean))
+```
+
+# 3. Explore Data Analysis (EDA)
+## A. Menampilkan hasil statistik deskriptif
+```{r}
+# Melakukan analisis deskripsi
+descr(data_clean)
+```
+## B. Visualisasi Distribusi
+```{r}
+# Histogram - Distribusi jumlah balita
+p1 <- ggplot(data_clean, aes(x = jumlah_balita)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data Jumlah Balita",
+       x = "Jumlah Balita",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Distribusi jumlah balita
+p2 <- ggplot(data_clean, aes(x = jumlah_balita)) +
+  geom_boxplot() +
+  labs(title = "Boxplot Jumlah Balita",
+       x = "Jumlah Balita",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Log Transformasi untuk membuat distribusi lebih seimbang
+data_clean$jumlah_balita <- log1p(data_clean$jumlah_balita)  # log1p untuk menangani nol
+
+# Histogram - Visualisasi Distribusi Data setelah Transformasi Log
+p3 <- ggplot(data_clean, aes(x = jumlah_balita)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data Jumlah Balita\n(Log Transformasi)",
+       x = "Log(Jumlah Balita)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Visualisasi Distribusi Data setelah Transformasi Log
+p4 <- ggplot(data_clean, aes(x = jumlah_balita)) +
+  geom_boxplot() +
+  labs(title = "Boxplot Jumlah Balita\n(Log Transformasi)",
+       x = "Log(Jumlah Balita)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+grid.arrange(p1, p2, ncol = 2)
+grid.arrange(p3, p4, ncol = 2)
+```
+```{r}
+# Histogram - Distribusi Perentase Tinggi Balita
+p5 <- ggplot(data_clean, aes(x = persentase_tinggi_balita)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data\nPersentase Tinggi Balita",
+       x = "Persentase Tinggi Balita",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Distribusi Persentase Tinggi Balita
+p6 <- ggplot(data_clean, aes(x = persentase_tinggi_balita)) +
+  geom_boxplot() +
+  labs(title = "Boxplot Persentase Tinggi Balita",
+       x = "Persentase Tinggi Balita",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Log Transformasi untuk membuat distribusi lebih seimbang
+data_clean$persentase_tinggi_balita <- log1p(data_clean$persentase_tinggi_balita)  # log1p untuk menangani nol
+
+# Histogram - Visualisasi Distribusi Data setelah Transformasi Log
+p7 <- ggplot(data_clean, aes(x = persentase_tinggi_balita)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data\nPersentase Tinggi Balita\n(Log Transformasi)",
+       x = "Log(Persentase Tinggi Balita)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Visualisasi Distribusi Data setelah Transformasi Log
+p8 <- ggplot(data_clean, aes(x = persentase_tinggi_balita)) +
+  geom_boxplot() +
+  labs(title = "Boxplot\nPersentase Tinggi Balita\n(Log Transformasi)",
+       x = "Log(Persentase Tinggi Balita)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+grid.arrange(p5, p6, ncol = 2)
+grid.arrange(p7, p8, ncol = 2)
+```
+```{r}
+# Histogram - Distribusi Perentase Gizi
+p9 <- ggplot(data_clean, aes(x = persentase_gizi)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data Persentase Gizi",
+       x = "Persentase Gizi",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Distribusi Persentase Gizi
+p10 <- ggplot(data_clean, aes(x = persentase_gizi)) +
+  geom_boxplot() +
+  labs(title = "Boxplot Persentase Gizi",
+       x = "Persentase Gizi",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Log Transformasi untuk membuat distribusi lebih seimbang
+data_clean$persentase_gizi <- log1p(data_clean$persentase_gizi)  # log1p untuk menangani nol
+
+# Histogram - Visualisasi Distribusi Data setelah Transformasi Log
+p11 <- ggplot(data_clean, aes(x = persentase_gizi)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data\nPersentase Gizi\n(Log Transformasi)",
+       x = "Log(Persentase Gizi)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Visualisasi Distribusi Data setelah Transformasi Log
+p12 <- ggplot(data_clean, aes(x = persentase_gizi)) +
+  geom_boxplot() +
+  labs(title = "Boxplot\nPersentase Gizi\n(Log Transformasi)",
+       x = "Log(Persentase Gizi)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+grid.arrange(p9, p10, ncol = 2)
+grid.arrange(p11, p12, ncol = 2)
+```
+```{r}
+# Histogram - Distribusi Perentase Penduduk Miskin
+p13 <- ggplot(data_clean, aes(x = persentase_penduduk_miskin)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data\nPersentase Penduduk Miskin",
+       x = "Persentase Penduduk Miskin",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Distribusi Persentase Penduduk Miskin
+p14 <- ggplot(data_clean, aes(x = persentase_penduduk_miskin)) +
+  geom_boxplot() +
+  labs(title = "Boxplot\nPersentase Penduduk Miskin",
+       x = "Persentase Penduduk Miskin",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Log Transformasi untuk membuat distribusi lebih seimbang
+data_clean$persentase_penduduk_miskin <- log1p(data_clean$persentase_penduduk_miskin)  # log1p untuk menangani nol
+
+# Histogram - Visualisasi Distribusi Data setelah Transformasi Log
+p15 <- ggplot(data_clean, aes(x = persentase_penduduk_miskin)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data\nPersentase Penduduk Miskin\n(Log Transformasi)",
+       x = "Log(Persentase Penduduk Miskin)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Visualisasi Distribusi Data setelah Transformasi Log
+p16 <- ggplot(data_clean, aes(x = persentase_penduduk_miskin)) +
+  geom_boxplot() +
+  labs(title = "Boxplot\nPersentase Penduduk Miskin\n(Log Transformasi)",
+       x = "Log(Persentase Penduduk Miskin)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+grid.arrange(p13, p14, ncol = 2)
+grid.arrange(p15, p16, ncol = 2)
+```
+```{r}
+# Histogram - Distribusi IPM
+p17 <- ggplot(data_clean, aes(x = ipm)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data IPM",
+       x = "IPM",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Distribusi IPM
+p18 <- ggplot(data_clean, aes(x = ipm)) +
+  geom_boxplot() +
+  labs(title = "Boxplot IPM",
+       x = "IPM",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Log Transformasi untuk membuat distribusi lebih seimbang
+data_clean$ipm <- log1p(data_clean$ipm)  # log1p untuk menangani nol
+
+# Histogram - Visualisasi Distribusi Data setelah Transformasi Log
+p19 <- ggplot(data_clean, aes(x = ipm)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data IPM \n(Log Transformasi)",
+       x = "Log(IPM)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Visualisasi Distribusi Data setelah Transformasi Log
+p20 <- ggplot(data_clean, aes(x = ipm)) +
+  geom_boxplot() +
+  labs(title = "Boxplot IPM \n(Log Transformasi)",
+       x = "Log(IPM)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+##Deteksi Outlier pada Jumlah Balita
+Q1_ipm <- quantile(data_clean$ipm, 0.25)
+Q3_ipm <- quantile(data_clean$ipm, 0.75)
+IQR_ipm <- Q3_ipm - Q1_ipm
+
+lower_bound_ipm <- Q1_ipm - 1.5 * IQR_ipm
+upper_bound_ipm <- Q3_ipm + 1.5 * IQR_ipm
+
+repeat {
+  Q1_ipm <- quantile(data_clean$ipm, 0.25, na.rm = TRUE)
+  Q3_ipm <- quantile(data_clean$ipm, 0.75, na.rm = TRUE)
+  IQR_ipm <- Q3_ipm - Q1_ipm
+  lower_bound_ipm <- Q1_ipm - 1.5 * IQR_ipm
+  upper_bound_ipm <- Q3_ipm + 1.5 * IQR_ipm
+  
+  # Simpan jumlah data sebelum filtering
+  n_before <- nrow(data_clean)
+  
+  # Hapus outlier langsung dari data_clean tanpa membuat dataset baru
+  data_clean <- data_clean[data_clean$ipm >= lower_bound_ipm & data_clean$ipm <= upper_bound_ipm, ]
+  
+  # Cek jika jumlah data tidak berubah, maka keluar dari loop
+  if (nrow(data_clean) == n_before) break
+}
+
+##Menghapus outlier
+data_clean <- data_clean[data_clean$ipm >= lower_bound_ipm & data_clean$ipm <= upper_bound_ipm, ]
+
+# Boxplot - Visualisasi Distribusi Data setelah Transformasi Log
+p21 <- ggplot(data_clean, aes(x = ipm)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data IPM\n(Interquartile Range (IQR))",
+       x = "IPM",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Visualisasi Distribusi Data setelah Transformasi Log
+p22 <- ggplot(data_clean, aes(x = ipm)) +
+  geom_boxplot() +
+  labs(title = "Boxplot IPM\n(Interquartile Range (IQR))",
+       x = "IPM",
+       y = "Frekuensi") +
+  theme_minimal()
+
+grid.arrange(p17, p18, ncol = 2)
+grid.arrange(p19, p20, ncol = 2)
+grid.arrange(p21, p22, ncol = 2)
+```
+```{r}
+# Histogram - Distribusi Nilai GDP
+p23 <- ggplot(data_clean, aes(x = nilai_gdp)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data Nilai GDP",
+       x = "Nilai GDP",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Distribusi Nilai GDP
+p24 <- ggplot(data_clean, aes(x = nilai_gdp)) +
+  geom_boxplot() +
+  labs(title = "Boxplot Nilai GDP",
+       x = "Nilai GDP",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Log Transformasi untuk membuat distribusi lebih seimbang
+data_clean$nilai_gdp <- log1p(data_clean$nilai_gdp)  # log1p untuk menangani nol
+
+# Histogram - Visualisasi Distribusi Data setelah Transformasi Log
+p25 <- ggplot(data_clean, aes(x = nilai_gdp)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data GDP\n(Log Transformasi)",
+       x = "Log(GDP)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Visualisasi Distribusi Data setelah Transformasi Log
+p26 <- ggplot(data_clean, aes(x = nilai_gdp)) +
+  geom_boxplot() +
+  labs(title = "Boxplot GDP\n(Log Transformasi)",
+       x = "Log(GDP)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+grid.arrange(p23, p24, ncol = 2)
+grid.arrange(p25, p26, ncol = 2)
+```
+```{r}
+# Histogram - Distribusi Upah
+p27 <- ggplot(data_clean, aes(x = upah)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data Upah",
+       x = "Upah",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Distribusi Upah
+p28 <- ggplot(data_clean, aes(x = upah)) +
+  geom_boxplot() +
+  labs(title = "Boxplot Upah",
+       x = "Upah",
+       y = "Frekuensi") +
+  theme_minimal()
+
+grid.arrange(p27, p28, ncol = 2)
+```
+```{r}
+# Histogram - Distribusi IDM
+p29 <- ggplot(data_clean, aes(x = idm)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data IDM",
+       x = "IDM",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Distribusi IDM
+p30 <- ggplot(data_clean, aes(x = idm)) +
+  geom_boxplot() +
+  labs(title = "Boxplot IDM",
+       x = "IDM",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Log Transformasi untuk membuat distribusi lebih seimbang
+data_clean$idm <- log1p(data_clean$idm)  # log1p untuk menangani nol
+
+# Histogram - Visualisasi Distribusi Data setelah Transformasi Log
+p31 <- ggplot(data_clean, aes(x = idm)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data IDM\n(Log Transformasi)",
+       x = "Log(IDM)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Visualisasi Distribusi Data setelah Transformasi Log
+p32 <- ggplot(data_clean, aes(x = idm)) +
+  geom_boxplot() +
+  labs(title = "Boxplot IDM\n(Log Transformasi)",
+       x = "Log(IDM)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+grid.arrange(p29, p30, ncol = 2)
+grid.arrange(p31, p32, ncol = 2)
+```
+```{r}
+# Histogram - Distribusi Persentase Stunting
+p33 <- ggplot(data_clean, aes(x = persentase_stunting)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data Persentase Stunting",
+       x = "Persentase Stunting",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Distribusi IDM
+p34 <- ggplot(data_clean, aes(x = persentase_stunting)) +
+  geom_boxplot() +
+  labs(title = "Boxplot Persentase Stunting",
+       x = "Persentase Stunting",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Log Transformasi untuk membuat distribusi lebih seimbang
+data_clean$persentase_stunting <- log1p(data_clean$persentase_stunting)  # log1p untuk menangani nol
+
+# Histogram - Visualisasi Distribusi Data setelah Transformasi Log
+p35 <- ggplot(data_clean, aes(x = persentase_stunting)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data Persentase Stunting\n(Log Transformasi)",
+       x = "Log(Persentase Stunting)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Visualisasi Distribusi Data setelah Transformasi Log
+p36 <- ggplot(data_clean, aes(x = persentase_stunting)) +
+  geom_boxplot() +
+  labs(title = "Boxplot Persentase Stunting\n(Log Transformasi)",
+       x = "Log(Persentase Stunting)",
+       y = "Frekuensi") +
+  theme_minimal()
+
+##Deteksi Outlier pada Persentase Stunting
+Q1_stunting <- quantile(data_clean$persentase_stunting, 0.25)
+Q3_stunting <- quantile(data_clean$persentase_stunting, 0.75)
+IQR_stunting <- Q3_stunting - Q1_stunting
+
+lower_bound_stunting <- Q1_stunting - 1.5 * IQR_stunting
+upper_bound_stunting <- Q3_stunting + 1.5 * IQR_stunting
+
+repeat {
+  Q1_stunting <- quantile(data_clean$persentase_stunting, 0.25, na.rm = TRUE)
+  Q3_stunting <- quantile(data_clean$persentase_stunting, 0.75, na.rm = TRUE)
+  IQR_stunting <- Q3_stunting - Q1_stunting
+  lower_bound_stunting <- Q1_stunting - 1.5 * IQR_stunting
+  upper_bound_stunting <- Q3_stunting + 1.5 * IQR_stunting
+  
+  # Simpan jumlah data sebelum filtering
+  n_before <- nrow(data_clean)
+  
+  # Hapus outlier langsung dari data_clean tanpa membuat dataset baru
+  data_clean <- data_clean[data_clean$persentase_stunting >= lower_bound_stunting & data_clean$persentase_stunting <= upper_bound_stunting, ]
+  
+  # Cek jika jumlah data tidak berubah, maka keluar dari loop
+  if (nrow(data_clean) == n_before) break
+}
+
+##Menghapus outlier
+data_clean <- data_clean[data_clean$persentase_stunting >= lower_bound_stunting & data_clean$persentase_stunting <= upper_bound_stunting, ]
+
+# Boxplot - Visualisasi Distribusi Data setelah Transformasi Log
+p37 <- ggplot(data_clean, aes(x = persentase_stunting)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black", alpha = 0.6) +
+  labs(title = "Distribusi Data Persentase Stunting\n(Interquartile Range (IQR))",
+       x = "Persentase Stunting",
+       y = "Frekuensi") +
+  theme_minimal()
+
+# Boxplot - Visualisasi Distribusi Data setelah Transformasi Log
+p38 <- ggplot(data_clean, aes(x = persentase_stunting)) +
+  geom_boxplot() +
+  labs(title = "Boxplot Persentase Stunting\n(Interquartile Range (IQR))",
+       x = "Persentase Stunting",
+       y = "Frekuensi") +
+  theme_minimal()
+
+
+grid.arrange(p33, p34, ncol = 2)
+grid.arrange(p35, p36, ncol = 2)
+grid.arrange(p37, p38, ncol = 2)
+```
+
+## C. Correlation Matrix 
+```{r}
+# Pilih hanya variabel numerik
+data_numeric <- data_clean %>%
+  select(where(is.numeric)) %>% 
+  select(-tahun)  # Exclude the year column
+
+# Hitung matriks korelasi
+cor_matrix <- cor(data_numeric, use = "pairwise.complete.obs", method = "pearson")
+
+# Temukan fitur yang memiliki korelasi tinggi (|r| > 0.75)
+high_cor <- findCorrelation(cor_matrix, cutoff = 0.75, names = FALSE)
+
+# Hapus fitur yang memiliki korelasi tinggi
+data_clean_highcor <- data_numeric %>% select(-all_of(names(data_numeric)[high_cor]))
+
+# Hitung kembali matriks korelasi setelah penghapusan
+cor_matrix_after <- cor(data_clean_highcor, use = "pairwise.complete.obs", method = "pearson")
+
+## Visualisasi Correlation Matrix
+ggcorrplot(cor_matrix, 
+           type = "lower",        # Hanya setengah bagian bawah
+           lab = TRUE,            # Menampilkan nilai korelasi
+           lab_size = 3,          # Ukuran teks
+           colors = c("red", "white", "blue"),  # Skala warna (Merah - Putih - Biru)
+           title = "Matriks Korelasi",
+           show.legend = TRUE, 
+           ggtheme = ggplot2::theme_minimal())
+
+## Visualisasi Setelah Penghapusan
+ggcorrplot(cor_matrix_after, 
+           type = "lower", 
+           lab = TRUE, 
+           lab_size = 3, 
+           colors = c("red", "white", "blue"), 
+           title = "Matriks Korelasi Setelah Penghapusan",
+           show.legend = TRUE, 
+           ggtheme = ggplot2::theme_minimal())
+```
+
+## D. Mutual Information
+```{r}
+# Mengubah variabel target menjadi faktor
+data_clean_highcor$persentase_stunting <- as.numeric(data_clean_highcor$persentase_stunting)
+
+# Hitung median dari data training (0= Rendah, 1= Tinggi)
+median_stunting <- median(data_clean_highcor$persentase_stunting)
+data_clean_highcor <- data_clean_highcor %>% 
+  mutate(persentase_stunting = ifelse(persentase_stunting > median_stunting, 1, 0))
+
+# Mengubah variabel target menjadi faktor
+data_clean_highcor$persentase_stunting <- as.factor(data_clean_highcor$persentase_stunting)
+
+# Mengubah nama variabel
+data_clean_highcor <- data_clean_highcor %>% 
+  rename(stunting = persentase_stunting)
+
+# Pre-Processing Data
+## Scaling
+preproc <- preProcess(data_clean_highcor, method = c("center", "scale"))
+
+## Normalisasi
+data_norm <- predict(preproc, data_clean_highcor)
+
+## Cek ringkasan data setelah standariAsasi
+summary(data_norm)
+```
+```{r}
+# Hitung mutual information antara semua fitur dan target
+mi_result <- information_gain(stunting ~ ., data = data_norm)
+
+# Urutkan dari yang paling informatif
+mi_result <- mi_result[order(-mi_result$importance), ]
+
+# Lihat hasilnya
+print(mi_result)
+```
+```{r}
+# Visualisasi
+ggplot(mi_result, aes(x = reorder(attributes, importance), y = importance)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  coord_flip() + 
+  labs(title = "Hasil Mutual Information",
+       x = "Fitur",
+       y = "Nilai Importance") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+```{r}
+# Menggambil fitur terbaik
+fitur_mi <- mi_result %>%
+  filter(importance > 0) %>%
+  pull(attributes)
+
+# Buat data hanya dengan fitur hasil mutual info
+hasil_mi <- data_clean_highcor[, c(fitur_mi, "stunting")]
+
+glimpse(hasil_mi)
+```
+```{r}
+#Visualisasi Distrubusi Stunting
+ggplot(hasil_mi, aes(x = stunting)) +
+  geom_bar(fill = "blue") +
+  labs(title = "Distribusi Data Stunting",
+       x = "Stunting",
+       y = "Frekuensi") +
+  theme_minimal()
+```
+```{r}
+table(hasil_mi$stunting)
+```
+# 4. Model
+## A. Pembagian Data
+```{r}
+set.seed(123) 
+data_index <- createDataPartition(hasil_mi$stunting, p = 0.7, list = FALSE)
+data_train <- hasil_mi[data_index, ]
+data_test <- hasil_mi[-data_index, ]
+glimpse(data_train)
+glimpse(data_test)
+```
+```{r}
+table(data_train$stunting)
+table(data_test$stunting)
+```
+
+# B. Membangun model RF
+```{r}
+# Model default
+set.seed(123)
+rf_model1 <- randomForest(stunting ~ ., data = data_train,
+                          ntree = 200,
+                          mtry = floor(sqrt(ncol(data_train)-1)),
+                          nodesize = 10,
+                          maxnodes = 20,
+                          importance = TRUE)
+
+# Prediksi & evaluasi
+pred_rf1 <- predict(rf_model1, data_test)
+conf_matrix_rf1 <- confusionMatrix(pred_rf1, data_test$stunting)
+
+## hasil
+print(rf_model1)
+print(conf_matrix_rf1)
+
+# Ekstrak confusion matrix dari caret
+cm_rfmodel1 <- as.data.frame(conf_matrix_rf1$table)
+
+# Ganti nama kolom supaya konsisten
+colnames(cm_rfmodel1) <- c("Prediction", "Reference", "Freq")
+
+# Plot pakai ggplot2
+ggplot(cm_rfmodel1, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = Freq), size = 6) +
+  scale_fill_gradient(low = "white", high = "skyblue") +
+  labs(
+    title = "Confusion Matrix - rf_model1",
+    x = "Actual (Reference)",
+    y = "Predicted",
+    fill = "Count"
+  ) +
+  theme_minimal() +
+  coord_fixed()
+```
+```{r}
+# Model 2: Lebih teratur dengan regularisasi
+set.seed(123)
+rf_model2 <- randomForest(stunting ~ ., data = data_train, 
+                         ntree = 300,  # Sedikit mengurangi jumlah pohon
+                         mtry = floor(sqrt(ncol(data_train)-1)),
+                         nodesize = 15,  # Ukuran node lebih besar
+                         maxnodes = 30,  # Batas node lebih longgar
+                         sampsize = 0.7*nrow(data_train), # Subsample data
+                         importance = TRUE)
+
+# Prediksi & evaluasi
+pred_rf2 <- predict(rf_model2, data_test)
+conf_matrix_rf2 <- confusionMatrix(pred_rf2, data_test$stunting)
+
+## hasil
+print(rf_model2)
+print(conf_matrix_rf2)
+
+    # Ekstrak confusion matrix dari caret
+cm_rfmodel2 <- as.data.frame(conf_matrix_rf2$table)
+
+# Ganti nama kolom supaya konsisten
+colnames(cm_rfmodel2) <- c("Prediction", "Reference", "Freq")
+
+# Plot pakai ggplot2
+ggplot(cm_rfmodel2, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = Freq), size = 6) +
+  scale_fill_gradient(low = "white", high = "skyblue") +
+  labs(
+    title = "Confusion Matrix - rf_model2",
+    x = "Actual (Reference)",
+    y = "Predicted",
+    fill = "Count"
+  ) +
+  theme_minimal() +
+  coord_fixed()
+```
+```{r}
+# Model 3: Konfigurasi sangat konservatif
+set.seed(123)
+rf_model3 <- randomForest(stunting ~ ., data = data_train, 
+                         ntree = 150, 
+                         mtry = max(floor(ncol(data_train)/3), 3), 
+                         nodesize = 25, 
+                         maxnodes = 15,
+                         strata = data_train$stunting,  # Stratified sampling
+                         sampsize = c("0" = 500, "1" = 500),  # Balanced subsample
+                         importance = TRUE)
+
+# Prediksi & evaluasi
+pred_rf3 <- predict(rf_model3, data_test)
+conf_matrix_rf3 <- confusionMatrix(pred_rf3, data_test$stunting)
+
+## hasil
+print(rf_model3)
+print(conf_matrix_rf3)
+
+# Ekstrak confusion matrix dari caret
+cm_rfmodel3 <- as.data.frame(conf_matrix_rf3$table)
+
+# Ganti nama kolom supaya konsisten
+colnames(cm_rfmodel3) <- c("Prediction", "Reference", "Freq")
+
+# Plot
+ggplot(cm_rfmodel3, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = Freq), size = 6) +
+  scale_fill_gradient(low = "white", high = "skyblue") +
+  labs(
+    title = "Confusion Matrix - rf_model3",
+    x = "Actual (Reference)",
+    y = "Predicted",
+    fill = "Count"
+  ) +
+  theme_minimal() +
+  coord_fixed()
+```
+## C. Membangun Model SVM
+```{r}
+# Model default
+svm_model1 <-svm(stunting ~., data = data_train,
+                 kernel='radial',
+                 cost = 100,
+                 gamma = 0.1)
+
+# Prediksi dan Evaluasi
+pred_svm1 <- predict(svm_model1, data_test)
+conf_matrix_svm1 <- confusionMatrix(pred_svm1, data_test$stunting)
+
+# Hasil model svm
+print(svm_model1)
+print(conf_matrix_svm1)
+
+# Ekstrak confusion matrix dari caret
+cm_svmmodel1 <- as.data.frame(conf_matrix_svm1$table)
+
+# Ganti nama kolom supaya konsisten
+colnames(cm_svmmodel1) <- c("Prediction", "Reference", "Freq")
+
+# Plot pakai ggplot2
+ggplot(cm_svmmodel1, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = Freq), size = 6) +
+  scale_fill_gradient(low = "white", high = "skyblue") +
+  labs(
+    title = "Confusion Matrix - svm_model1",
+    x = "Actual (Reference)",
+    y = "Predicted",
+    fill = "Count"
+  ) +
+  theme_minimal() +
+  coord_fixed()
+```
+```{r}
+# Model 2: Kernel radial dengan regularisasi lebih ketat
+svm_model2 <- svm(stunting ~., data = data_train, 
+                 kernel = 'radial',
+                 cost = 10,  # Regularisasi lebih kuat
+                 gamma = 0.01,  # Pengaruh titik data lebih kecil
+                 class.weights = c("0" = 1, "1" = 2))  # Menangani ketidakseimbangan kelas
+
+# Prediksi dan Evaluasi
+pred_svm2 <- predict(svm_model2, data_test)
+conf_matrix_svm2 <- confusionMatrix(pred_svm2, data_test$stunting)
+
+# Hasil model svm
+print(svm_model2)
+print(conf_matrix_svm2)
+
+# Ekstrak confusion matrix dari caret
+cm_svmmodel2 <- as.data.frame(conf_matrix_svm2$table)
+
+# Ganti nama kolom supaya konsisten
+colnames(cm_svmmodel2) <- c("Prediction", "Reference", "Freq")
+
+# Plot pakai ggplot2
+ggplot(cm_svmmodel2, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = Freq), size = 6) +
+  scale_fill_gradient(low = "white", high = "skyblue") +
+  labs(
+    title = "Confusion Matrix - svm_model2",
+    x = "Actual (Reference)",
+    y = "Predicted",
+    fill = "Count"
+  ) +
+  theme_minimal() +
+  coord_fixed()
+```
+```{r}
+# Model 3: Kernel polynomial dengan regularisasi
+svm_model3 <- svm(stunting ~., data = data_train, 
+                 kernel = 'polynomial', 
+                 cost = 0.5,  # Margin lebih lebar
+                 scale = TRUE,  # Scaling otomatis
+                 class.weights = c("0" = 1, "1" = 1.5))  # Bobot kelas
+
+# Prediksi dan Evaluasi
+pred_svm3 <- predict(svm_model3, data_test)
+conf_matrix_svm3 <- confusionMatrix(pred_svm3, data_test$stunting)
+
+# Hasil model svm
+print(svm_model3)
+print(conf_matrix_svm3)
+
+# Ekstrak confusion matrix dari caret
+cm_svmmodel3 <- as.data.frame(conf_matrix_svm3$table)
+
+# Ganti nama kolom supaya konsisten
+colnames(cm_svmmodel3) <- c("Prediction", "Reference", "Freq")
+
+# Plot pakai ggplot2
+ggplot(cm_svmmodel3, aes(x = Reference, y = Prediction, fill = Freq)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = Freq), size = 6) +
+  scale_fill_gradient(low = "white", high = "skyblue") +
+  labs(
+    title = "Confusion Matrix - svm_model3",
+    x = "Actual (Reference)",
+    y = "Predicted",
+    fill = "Count"
+  ) +
+  theme_minimal() +
+  coord_fixed()
+```
+
+# 5. Interpret
+```{r}
+# Extract Metrics RF
+metrics_rf1 <- conf_matrix_rf1$byClass[c("Precision", "Recall", "F1")]
+accuracy_rf1 <- conf_matrix_rf1$overall["Accuracy"]
+
+metrics_rf2 <- conf_matrix_rf2$byClass[c("Precision", "Recall", "F1")]
+accuracy_rf2 <- conf_matrix_rf2$overall["Accuracy"]
+
+metrics_rf3 <- conf_matrix_rf3$byClass[c("Precision", "Recall", "F1")]
+accuracy_rf3 <- conf_matrix_rf3$overall["Accuracy"]
+
+# Gabungkan semua metrik ke dalam satu tibble
+metrics_rf <- bind_rows(
+  tibble(Model = "rf_model1",
+         Metric = c("Recall", "Precision", "F1", "Accuracy"),
+         Value = c(conf_matrix_rf1$byClass[c("Precision", "Recall", "F1")],
+                   conf_matrix_rf1$overall["Accuracy"])),
+  tibble(Model = "rf_model2",
+         Metric = c("Recall", "Precision", "F1", "Accuracy"),
+         Value = c(conf_matrix_rf2$byClass[c("Precision", "Recall", "F1")],
+                   conf_matrix_rf2$overall["Accuracy"])),
+  tibble(Model = "rf_model3",
+         Metric = c("Recall", "Precision", "F1", "Accuracy"),
+         Value = c(conf_matrix_rf3$byClass[c("Precision", "Recall", "F1")],
+                   conf_matrix_rf3$overall["Accuracy"]))
+)
+
+# Visualisasi 
+ggplot(metrics_rf, aes(x = Metric, y = Value, fill = Model)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), width = 0.7) +
+  geom_text(aes(label = round(Value, 3)), 
+            position = position_dodge(0.8),
+            vjust = -0.5, 
+            size = 3) +
+  labs(title = "Perbandingan Model Random Forest",
+       y = "Nilai Metrik",
+       x = "Metrix Evaluasi",
+       fill = "Model") +
+  theme_minimal()
+```
+
+```{r}
+# Extract Metrics SVM
+metrics_svm1 <- conf_matrix_svm1$byClass[c("Precision", "Recall", "F1")]
+accuracy_svm1 <- conf_matrix_svm1$overall["Accuracy"]
+
+metrics_svm2 <- conf_matrix_svm2$byClass[c("Precision", "Recall", "F1")]
+accuracy_svm2 <- conf_matrix_svm2$overall["Accuracy"]
+
+metrics_svm3 <- conf_matrix_svm3$byClass[c("Precision", "Recall", "F1")]
+accuracy_svm3 <- conf_matrix_svm3$overall["Accuracy"]
+
+# Gabungkan semua metrik ke dalam satu tibble
+metrics_svm <- bind_rows(
+  tibble(Model = "svm_model1",
+         Metric = c("Recall", "Precision", "F1", "Accuracy"),
+         Value = c(conf_matrix_svm1$byClass[c("Precision", "Recall", "F1")],
+                   conf_matrix_svm1$overall["Accuracy"])),
+  tibble(Model = "svm_model2",
+         Metric = c("Recall", "Precision", "F1", "Accuracy"),
+         Value = c(conf_matrix_svm2$byClass[c("Precision", "Recall", "F1")],
+                   conf_matrix_svm2$overall["Accuracy"])),
+  tibble(Model = "svm_model3",
+         Metric = c("Recall", "Precision", "F1", "Accuracy"),
+         Value = c(conf_matrix_svm3$byClass[c("Precision", "Recall", "F1")],
+                   conf_matrix_svm3$overall["Accuracy"]))
+)
+
+# Visualisasi 
+ggplot(metrics_svm, aes(x = Metric, y = Value, fill = Model)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), width = 0.7) +
+  geom_text(aes(label = round(Value, 3)), 
+            position = position_dodge(0.8),
+            vjust = -0.5, 
+            size = 3) +
+  labs(title = "Perbandingan Model SVM",
+       y = "Nilai Metrik",
+       x = "Metrix Evaluasi",
+       fill = "Model") +
+  theme_minimal()
+```
+```{r}
+# RF vs SVM
+metrics_rf_svm <- tibble(
+  Metric = c("Accuracy", "Recall", "Precision", "F1-score"),
+  RF = c(accuracy_rf2, metrics_rf2),
+  SVM = c(accuracy_svm1, metrics_svm1)
+) %>%
+  pivot_longer(cols = c(RF, SVM), names_to = "Model", values_to = "Value")
+
+# Visualisasi
+ggplot(metrics_rf_svm, aes(x = Metric, y = Value, fill = Model)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  geom_text(aes(label = round(Value, 3)), 
+            position = position_dodge(width = 0.7), 
+            vjust = -0.5, size = 3) +
+  scale_fill_manual(values = c("RF" = "#1b9e77", "SVM" = "#d95f02")) +
+  labs(title = "Perbandingan Kinerja Random Forest vs SVM",
+       y = "Nilai Metrik",
+       x = "Metrik Evaluasi") +
+  theme_minimal()
+```
+
+```{r}
+# Buat objek prediktor SVM
+predictor_svm1 <- Predictor$new(
+  model = svm_model1,
+  data = data_test[, -which(names(data_test) == "stunting")],
+  y = data_test$stunting
+)
+
+# Melakukan Permutation importance
+imp_svm1 <- FeatureImp$new(predictor_svm1, loss = "ce", compare = "difference")
+
+# Ambil hasil importance dari model
+df_svm1 <- as.data.frame(imp_svm1$results)
+
+
+# Visualisasi importance
+ggplot(df_svm1, aes(x = reorder(feature, importance), y = importance)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  coord_flip() +
+  labs(
+    title = "Feature Importance SVM",
+    x = "Fitur",
+    y = "Importance (Penurunan Akurasi)"
+  ) +
+  theme_minimal()
+```
