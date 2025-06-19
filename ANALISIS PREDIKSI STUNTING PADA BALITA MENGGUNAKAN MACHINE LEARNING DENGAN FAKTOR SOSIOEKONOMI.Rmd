@@ -12,8 +12,6 @@ output: html_document
 library(tidyverse)
 # library untuk manipulasi data
 library(dplyr)
-# library untuk manipulasi data tanggal
-library(lubridate)
 # library untuk menampilkan hasil statistik deskriptif
 library(summarytools)
 # library untuk visualisasi data
@@ -23,10 +21,6 @@ library(gridExtra)
 # library untuk membaca data dari file Excel (.xlsx)
 library(readxl)
 library(caret)
-#PCA
-library(FactoMineR)
-#visualisasi PCA
-library(factoextra)
 #Correlation Matrix
 library(corrplot)
 # Visualisasi Correlation Matrix
@@ -40,20 +34,21 @@ library(e1071)
 library(reshape2)
 library(iml)
 library(mlr) 
+library(FSelectorRcpp)
 ```
 # 1. Obtain
-## a. Import Dataset
+## A. Import Dataset
 ```{r}
 stunting <- read_excel("Dataset/stunting.xlsx")
 stunting
 ```
 # 2. Scrup Data
-## a. Melihat struktur Data
+## A. Melihat struktur Data
 ```{r}
 #Menampilkan struktur data
 glimpse(stunting)
 ```
-## b. Mengkonversi data ke tipe numerik
+## B. Mengkonversi data ke tipe numerik
 ```{r}
 # Melakukan Kelas Biner Terhadap Variabel Kategorial
 data_transform <- stunting %>%
@@ -84,12 +79,12 @@ colSums(is.na(data_clean))
 ```
 
 # 3. Explore Data Analysis (EDA)
-## a.Menampilkan hasil statistik deskriptif
+## A. Menampilkan hasil statistik deskriptif
 ```{r}
-#Melakukan analisis deskripsi
+# Melakukan analisis deskripsi
 descr(data_clean)
 ```
-## c. Visualisasi Distribusi
+## B. Visualisasi Distribusi
 ```{r}
 # Histogram - Distribusi jumlah balita
 p1 <- ggplot(data_clean, aes(x = jumlah_balita)) +
@@ -512,59 +507,27 @@ grid.arrange(p33, p34, ncol = 2)
 grid.arrange(p35, p36, ncol = 2)
 grid.arrange(p37, p38, ncol = 2)
 ```
-# 4. Model
-## a. Pembagian Data
+
+## C. Correlation Matrix 
 ```{r}
-set.seed(123) 
-data_index <- createDataPartition(data_clean$persentase_stunting, p = 0.7, list = FALSE)
-data_train <- data_clean[data_index, ]
-data_test <- data_clean[-data_index, ]
-data_train
-data_test
-```
-## b. Memisahkan variabel target dengan fitur
-```{r}
-# Hitung median dari data training
-median_train <- median(data_train$persentase_stunting)
-data_train <- data_train %>% 
-  mutate(persentase_stunting = ifelse(persentase_stunting > median_train, 1, 0))
-
-# Terapkan median yang sama ke data test
-data_test <- data_test %>% 
-  mutate(persentase_stunting = ifelse(persentase_stunting > median_train, 1, 0))
-
-# Mengubah variabel target menjadi faktor
-data_train$persentase_stunting <- as.factor(data_train$persentase_stunting)
-data_test$persentase_stunting <- as.factor(data_test$persentase_stunting)
-
-# Pisahkan target dan fitur di data training
-train_target <- data_train$persentase_stunting
-train_features <- data_train %>% select(-persentase_stunting)
-
-# Pisahkan target dan fitur di data test
-test_target <- data_test$persentase_stunting
-test_features <- data_test %>% select(-persentase_stunting)
-```
-## c. Memilih Fitur Terbaik 
-```{r}
-# Correlation Matrix
-## Pilih hanya variabel numerik
-train_features <- train_features %>%
+# Pilih hanya variabel numerik
+data_numeric <- data_clean %>%
   select(where(is.numeric)) %>% 
   select(-tahun)  # Exclude the year column
 
-## Hitung matriks korelasi
-cor_matrix <- cor(train_features, use = "pairwise.complete.obs", method = "pearson")
+# Hitung matriks korelasi
+cor_matrix <- cor(data_numeric, use = "pairwise.complete.obs", method = "pearson")
 
-## Temukan fitur yang memiliki korelasi tinggi (|r| > 0.75)
+# Temukan fitur yang memiliki korelasi tinggi (|r| > 0.75)
 high_cor <- findCorrelation(cor_matrix, cutoff = 0.75, names = FALSE)
 
-## Hapus fitur yang memiliki korelasi tinggi
-train_features <- train_features %>% select(-all_of(names(train_features)[high_cor]))
+# Hapus fitur yang memiliki korelasi tinggi
+data_clean_highcor <- data_numeric %>% select(-all_of(names(data_numeric)[high_cor]))
 
-## Hitung kembali matriks korelasi setelah penghapusan
-cor_matrix_after <- cor(train_features, use = "pairwise.complete.obs", method = "pearson")
+# Hitung kembali matriks korelasi setelah penghapusan
+cor_matrix_after <- cor(data_clean_highcor, use = "pairwise.complete.obs", method = "pearson")
 
+## Visualisasi Correlation Matrix
 ggcorrplot(cor_matrix, 
            type = "lower",        # Hanya setengah bagian bawah
            lab = TRUE,            # Menampilkan nilai korelasi
@@ -574,7 +537,7 @@ ggcorrplot(cor_matrix,
            show.legend = TRUE, 
            ggtheme = ggplot2::theme_minimal())
 
-## Plot Setelah Penghapusan (Untuk Perbandingan)
+## Visualisasi Setelah Penghapusan
 ggcorrplot(cor_matrix_after, 
            type = "lower", 
            lab = TRUE, 
@@ -583,110 +546,70 @@ ggcorrplot(cor_matrix_after,
            title = "Matriks Korelasi Setelah Penghapusan",
            show.legend = TRUE, 
            ggtheme = ggplot2::theme_minimal())
-
 ```
 
-
+## D. Mutual Information
 ```{r}
-# Recursive Feature Elimination (RFE)
-set.seed(123)
-# Kontrol untuk RFE
-control <- rfeControl(functions = rfFuncs,
-                      method = "cv",
-                      number = 5)
-# Jalankan Recursive Feature Elimination
-rfe_result <- rfe(train_features, train_target, sizes = c(1:10), rfeControl = control)
-rfe_result
-```
-```{r}
-# Buat dataframe hasil RFE
-feature_ranking <- data.frame(
-  Feature = rownames(varImp(rfe_result)),
-  Importance = varImp(rfe_result)$Overall
-)
+# Mengubah variabel target menjadi faktor
+data_clean_highcor$persentase_stunting <- as.numeric(data_clean_highcor$persentase_stunting)
 
-# Plot ranking fitur
-ggplot(feature_ranking, aes(x = reorder(Feature, Importance), y = Importance)) +
-  geom_bar(stat = "identity", fill = "blue") + 
-  coord_flip() +
-  labs(title = "Feature Ranking dari RFE",
-       x = "Fitur", 
-       y = "Pentingnya Fitur") +
-  theme_minimal()
-  
-```
-```{r}
-## Mengambil nama fitur terbaik
-manual_selected <- c("ipm", "upah", "jumlah_balita")
+# Hitung median dari data training (0= Rendah, 1= Tinggi)
+median_stunting <- median(data_clean_highcor$persentase_stunting)
+data_clean_highcor <- data_clean_highcor %>% 
+  mutate(persentase_stunting = ifelse(persentase_stunting > median_stunting, 1, 0))
 
-## Data frame hanya dengan fitur yang dipilih
-train_features <- train_features[, manual_selected]
-test_features <- test_features[, manual_selected]
-```
+# Mengubah variabel target menjadi faktor
+data_clean_highcor$persentase_stunting <- as.factor(data_clean_highcor$persentase_stunting)
 
-```{r}
+# Mengubah nama variabel
+data_clean_highcor <- data_clean_highcor %>% 
+  rename(stunting = persentase_stunting)
+
 # Pre-Processing Data
 ## Scaling
-preproc <- preProcess(train_features, method = c("center", "scale"))
+preproc <- preProcess(data_clean_highcor, method = c("center", "scale"))
 
 ## Normalisasi
-train_scaled <- predict(preproc, train_features)
-test_scaled <- predict(preproc, test_features)
+data_norm <- predict(preproc, data_clean_highcor)
 
-## Cek ringkasan data setelah standarisasi
-summary(train_scaled)
+## Cek ringkasan data setelah standariAsasi
+summary(data_norm)
 ```
 ```{r}
-## Jalankan PCA dengan data yang telah distandarisasi
-pca_model <- PCA(train_scaled, graph = FALSE)
+# Hitung mutual information antara semua fitur dan target
+mi_result <- information_gain(stunting ~ ., data = data_norm)
 
-## Transform data test
-test_pca <- predict(pca_model, newdata = test_scaled)
+# Urutkan dari yang paling informatif
+mi_result <- mi_result[order(-mi_result$importance), ]
 
-## Lihat ringkasan PCA
-summary(pca_model)
+# Lihat hasilnya
+print(mi_result)
 ```
 ```{r}
-## Melacak kontribusi variabel
-pca_model$var$contrib
+# Visualisasi
+ggplot(mi_result, aes(x = reorder(attributes, importance), y = importance)) +
+  geom_bar(stat = "identity", fill = "blue") +
+  coord_flip() + 
+  labs(title = "Hasil Mutual Information",
+       x = "Fitur",
+       y = "Nilai Importance") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
 ```
 ```{r}
-## Jumlah komponen utama yang optimal untuk analisis
-fviz_eig(pca_model, addlabels = TRUE, ylim = c(0, 100))
-```
-```{r}
-## Membuat peta factor untuk kontribusi variabel
-fviz_pca_var(pca_model, col.var = "contrib", gradient.cols = c("#002bbb", "#bb2e00"), repel = TRUE)
-```
-```{r}
-## Visualisasi kontribusi dari variabel
-fviz_contrib(pca_model, choice = "var", axes = 1, top = 5)
-```
-Keterangan: Garis merah mengacu pada persentase yang diharapkan jika distribusi tersebut merata
-```{r}
-# Visualisasi untuk semua hubungan antar variabel
-fviz_pca_biplot(pca_model,
-                repel = TRUE,          # Menghindari label saling tumpang tindih
-                label = "var",         # Menampilkan hanya nama variabel
-                col.var = "blue",      # Warna vektor variabel
-                col.ind = "black",     # Warna titik individu
-                geom.ind = "point",    # Tampilkan individu sebagai titik
-                addEllipses = FALSE    # Tidak menampilkan ellips
-)
-```
-# d. Menggabungkan variabel feature dengan variabel target
-```{r}
-# Menggabungkan variabel feature dengan variabel target
-train_final <- cbind(train_features, stunting = train_target)
-test_final <- cbind(test_features, stunting = test_target)
+# Menggambil fitur terbaik
+fitur_mi <- mi_result %>%
+  filter(importance > 0) %>%
+  pull(attributes)
 
-# Menggabungkan variabel feature dengan Target dari PCA
-train_final1 <- cbind(as.data.frame(pca_model$ind$coord), stunting = data_train$persentase_stunting)
-test_final1 <- cbind(as.data.frame(test_pca$coord), stunting = data_test$persentase_stunting)
+# Buat data hanya dengan fitur hasil mutual info
+hasil_mi <- data_clean_highcor[, c(fitur_mi, "stunting")]
+
+glimpse(hasil_mi)
 ```
 ```{r}
 #Visualisasi Distrubusi Stunting
-ggplot(train_final, aes(x = stunting)) +
+ggplot(hasil_mi, aes(x = stunting)) +
   geom_bar(fill = "blue") +
   labs(title = "Distribusi Data Stunting",
        x = "Stunting",
@@ -694,29 +617,37 @@ ggplot(train_final, aes(x = stunting)) +
   theme_minimal()
 ```
 ```{r}
-table(train_final$stunting)
+table(hasil_mi$stunting)
+```
+# 4. Model
+## A. Pembagian Data
+```{r}
+set.seed(123) 
+data_index <- createDataPartition(hasil_mi$stunting, p = 0.7, list = FALSE)
+data_train <- hasil_mi[data_index, ]
+data_test <- hasil_mi[-data_index, ]
+glimpse(data_train)
+glimpse(data_test)
 ```
 ```{r}
-# Memastikan target adalah factor
-train_final$stunting <- as.factor(train_final$stunting)
-test_final$stunting <- as.factor(test_final$stunting)
-glimpse(train_final)
-glimpse(test_final)
+table(data_train$stunting)
+table(data_test$stunting)
 ```
-# e. Membangun model RF
+
+# B. Membangun model RF
 ```{r}
 # Model default
 set.seed(123)
-rf_model1 <- randomForest(stunting ~ ., data = train_final,
+rf_model1 <- randomForest(stunting ~ ., data = data_train,
                           ntree = 200,
-                          mtry = floor(sqrt(ncol(train_final)-1)),
+                          mtry = floor(sqrt(ncol(data_train)-1)),
                           nodesize = 10,
                           maxnodes = 20,
                           importance = TRUE)
 
 # Prediksi & evaluasi
-pred_rf1 <- predict(rf_model1, test_final)
-conf_matrix_rf1 <- confusionMatrix(pred_rf1, test_final$stunting)
+pred_rf1 <- predict(rf_model1, data_test)
+conf_matrix_rf1 <- confusionMatrix(pred_rf1, data_test$stunting)
 
 ## hasil
 print(rf_model1)
@@ -745,23 +676,23 @@ ggplot(cm_rfmodel1, aes(x = Reference, y = Prediction, fill = Freq)) +
 ```{r}
 # Model 2: Lebih teratur dengan regularisasi
 set.seed(123)
-rf_model2 <- randomForest(stunting ~ ., data = train_final, 
+rf_model2 <- randomForest(stunting ~ ., data = data_train, 
                          ntree = 300,  # Sedikit mengurangi jumlah pohon
-                         mtry = floor(sqrt(ncol(train_final)-1)),
+                         mtry = floor(sqrt(ncol(data_train)-1)),
                          nodesize = 15,  # Ukuran node lebih besar
                          maxnodes = 30,  # Batas node lebih longgar
-                         sampsize = 0.7*nrow(train_final), # Subsample data
+                         sampsize = 0.7*nrow(data_train), # Subsample data
                          importance = TRUE)
 
 # Prediksi & evaluasi
-pred_rf2 <- predict(rf_model2, test_final)
-conf_matrix_rf2 <- confusionMatrix(pred_rf2, test_final$stunting)
+pred_rf2 <- predict(rf_model2, data_test)
+conf_matrix_rf2 <- confusionMatrix(pred_rf2, data_test$stunting)
 
 ## hasil
 print(rf_model2)
 print(conf_matrix_rf2)
 
-# Ekstrak confusion matrix dari caret
+    # Ekstrak confusion matrix dari caret
 cm_rfmodel2 <- as.data.frame(conf_matrix_rf2$table)
 
 # Ganti nama kolom supaya konsisten
@@ -784,18 +715,18 @@ ggplot(cm_rfmodel2, aes(x = Reference, y = Prediction, fill = Freq)) +
 ```{r}
 # Model 3: Konfigurasi sangat konservatif
 set.seed(123)
-rf_model3 <- randomForest(stunting ~ ., data = train_final, 
+rf_model3 <- randomForest(stunting ~ ., data = data_train, 
                          ntree = 150, 
-                         mtry = max(floor(ncol(train_final)/3), 3), 
+                         mtry = max(floor(ncol(data_train)/3), 3), 
                          nodesize = 25, 
                          maxnodes = 15,
-                         strata = train_final$stunting,  # Stratified sampling
+                         strata = data_train$stunting,  # Stratified sampling
                          sampsize = c("0" = 500, "1" = 500),  # Balanced subsample
                          importance = TRUE)
 
 # Prediksi & evaluasi
-pred_rf3 <- predict(rf_model3, test_final)
-conf_matrix_rf3 <- confusionMatrix(pred_rf3, test_final$stunting)
+pred_rf3 <- predict(rf_model3, data_test)
+conf_matrix_rf3 <- confusionMatrix(pred_rf3, data_test$stunting)
 
 ## hasil
 print(rf_model3)
@@ -807,7 +738,7 @@ cm_rfmodel3 <- as.data.frame(conf_matrix_rf3$table)
 # Ganti nama kolom supaya konsisten
 colnames(cm_rfmodel3) <- c("Prediction", "Reference", "Freq")
 
-# Plot pakai ggplot2
+# Plot
 ggplot(cm_rfmodel3, aes(x = Reference, y = Prediction, fill = Freq)) +
   geom_tile(color = "black") +
   geom_text(aes(label = Freq), size = 6) +
@@ -821,18 +752,17 @@ ggplot(cm_rfmodel3, aes(x = Reference, y = Prediction, fill = Freq)) +
   theme_minimal() +
   coord_fixed()
 ```
-
-## f. Membangun Model SVM
+## C. Membangun Model SVM
 ```{r}
 # Model default
-svm_model1 <-svm(stunting ~., data =train_final,
+svm_model1 <-svm(stunting ~., data = data_train,
                  kernel='radial',
                  cost = 100,
                  gamma = 0.1)
 
 # Prediksi dan Evaluasi
-pred_svm1 <- predict(svm_model1, test_final)
-conf_matrix_svm1 <- confusionMatrix(pred_svm1, test_final$stunting)
+pred_svm1 <- predict(svm_model1, data_test)
+conf_matrix_svm1 <- confusionMatrix(pred_svm1, data_test$stunting)
 
 # Hasil model svm
 print(svm_model1)
@@ -860,15 +790,15 @@ ggplot(cm_svmmodel1, aes(x = Reference, y = Prediction, fill = Freq)) +
 ```
 ```{r}
 # Model 2: Kernel radial dengan regularisasi lebih ketat
-svm_model2 <- svm(stunting ~., data = train_final, 
+svm_model2 <- svm(stunting ~., data = data_train, 
                  kernel = 'radial',
                  cost = 10,  # Regularisasi lebih kuat
                  gamma = 0.01,  # Pengaruh titik data lebih kecil
                  class.weights = c("0" = 1, "1" = 2))  # Menangani ketidakseimbangan kelas
 
 # Prediksi dan Evaluasi
-pred_svm2 <- predict(svm_model2, test_final)
-conf_matrix_svm2 <- confusionMatrix(pred_svm2, test_final$stunting)
+pred_svm2 <- predict(svm_model2, data_test)
+conf_matrix_svm2 <- confusionMatrix(pred_svm2, data_test$stunting)
 
 # Hasil model svm
 print(svm_model2)
@@ -896,15 +826,15 @@ ggplot(cm_svmmodel2, aes(x = Reference, y = Prediction, fill = Freq)) +
 ```
 ```{r}
 # Model 3: Kernel polynomial dengan regularisasi
-svm_model3 <- svm(stunting ~., data = train_final, 
+svm_model3 <- svm(stunting ~., data = data_train, 
                  kernel = 'polynomial', 
                  cost = 0.5,  # Margin lebih lebar
                  scale = TRUE,  # Scaling otomatis
                  class.weights = c("0" = 1, "1" = 1.5))  # Bobot kelas
 
 # Prediksi dan Evaluasi
-pred_svm3 <- predict(svm_model3, test_final)
-conf_matrix_svm3 <- confusionMatrix(pred_svm3, test_final$stunting)
+pred_svm3 <- predict(svm_model3, data_test)
+conf_matrix_svm3 <- confusionMatrix(pred_svm3, data_test$stunting)
 
 # Hasil model svm
 print(svm_model3)
@@ -1036,48 +966,28 @@ ggplot(metrics_rf_svm, aes(x = Metric, y = Value, fill = Model)) +
 ```
 
 ```{r}
-# Buat prediktor untuk model RF
-predictor_rf2 <- Predictor$new(
-  model = rf_model2,
-  data = test_final[, -which(names(test_final) == "stunting")],
-  y = test_final$stunting
-)
-
 # Buat objek prediktor SVM
 predictor_svm1 <- Predictor$new(
   model = svm_model1,
-  data = test_final[, -which(names(test_final) == "stunting")],  # semua fitur
-  y = test_final$stunting
+  data = data_test[, -which(names(data_test) == "stunting")],
+  y = data_test$stunting
 )
 
-# feature importance dengan Permutation
-imp_rf2 <- FeatureImp$new(predictor_rf2, loss = "ce", compare = "difference")
+# Melakukan Permutation importance
 imp_svm1 <- FeatureImp$new(predictor_svm1, loss = "ce", compare = "difference")
 
-
 # Ambil hasil importance dari model
-df_rf2 <- as.data.frame(imp_rf2$results)
 df_svm1 <- as.data.frame(imp_svm1$results)
 
-# importance untuk Random Forest
-p39 <- ggplot(df_rf2, aes(x = reorder(feature, importance), y = importance)) +
-  geom_bar(stat = "identity", fill = "blue") +
-  coord_flip() +
-  labs(title = "Permutation\nFeature Importance\nRandom Forest",
-       x = "Fitur",
-       y = "Importance (Penurunan Akurasi)") +
-  theme_minimal()
 
-# importance untuk SVM
-p40 <- ggplot(df_svm1, aes(x = reorder(feature, importance), y = importance)) +
+# Visualisasi importance
+ggplot(df_svm1, aes(x = reorder(feature, importance), y = importance)) +
   geom_bar(stat = "identity", fill = "blue") +
   coord_flip() +
   labs(
-    title = "Permutation\nFeature Importance\nSVM",
+    title = "Feature Importance SVM",
     x = "Fitur",
     y = "Importance (Penurunan Akurasi)"
   ) +
   theme_minimal()
-
-grid.arrange(p39, p40, ncol = 2)
 ```
