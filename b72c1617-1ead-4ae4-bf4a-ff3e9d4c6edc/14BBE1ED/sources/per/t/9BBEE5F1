@@ -3,7 +3,7 @@
     "path": "~/Kuliah/Semester 7/Skripsi/tugas-akhir/ANALISIS PREDIKSI STUNTING PADA BALITA MENGGUNAKAN MACHINE LEARNING DENGAN FAKTOR SOSIOEKONOMI.Rmd",
     "project_path": "ANALISIS PREDIKSI STUNTING PADA BALITA MENGGUNAKAN MACHINE LEARNING DENGAN FAKTOR SOSIOEKONOMI.Rmd",
     "type": "r_markdown",
-    "hash": "0",
+    "hash": "75431212",
     "contents": "",
     "dirty": false,
     "created": 1750309793779.0,
@@ -12,15 +12,15 @@
     "properties": {
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "652,0",
-        "scrollLine": "617"
+        "cursorPosition": "1319,0",
+        "scrollLine": "1322"
     },
     "folds": "",
-    "lastKnownWriteTime": 1753943287,
+    "lastKnownWriteTime": 1753948939,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1753943287987,
+    "last_content_update": 1753948939625,
     "read_only": false,
     "read_only_alternatives": []
 }

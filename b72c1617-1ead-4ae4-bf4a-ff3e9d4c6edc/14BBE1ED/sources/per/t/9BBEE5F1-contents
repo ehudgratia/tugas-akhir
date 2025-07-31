@@ -1316,3 +1316,48 @@ ggplot(df_svm, aes(x = reorder(feature, importance), y = importance)) +
   ) +
   theme_minimal()
 ```
+
+```{r}
+perm_importance_class1 <- function(model, data_test, target_var, metric = "recall") {
+  y_true <- data_test[[target_var]]
+  if (!is.factor(y_true)) y_true <- as.factor(y_true)
+
+  # Buat data prediksi tanpa kolom target
+  x_test <- data_test[, setdiff(names(data_test), target_var)]
+
+  # Baseline prediksi & metrik
+  y_pred <- predict(model, x_test)
+  baseline <- recall_vec(truth = y_true, estimate = y_pred, estimator = "binary", event_level = "second")
+
+  importance <- c()
+
+  for (feature in names(x_test)) {
+    permuted_x <- x_test
+    permuted_x[[feature]] <- sample(permuted_x[[feature]])
+
+    perm_pred <- predict(model, permuted_x)
+
+    perm_metric <- recall_vec(truth = y_true, estimate = perm_pred, estimator = "binary", event_level = "second")
+
+    importance[feature] <- baseline - perm_metric
+  }
+
+  tibble(
+    Feature = names(importance),
+    Importance = importance
+  ) %>%
+    arrange(desc(Importance))
+}
+
+```
+```{r}
+importance_radial3 <- perm_importance_class1(
+  model = svm_model_radial3,
+  data_test = data_test,
+  target_var = "stunting"
+)
+
+print(importance_radial3)
+```
+
+
